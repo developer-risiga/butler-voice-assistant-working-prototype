@@ -6,9 +6,7 @@ import os
 import sys
 import asyncio
 import importlib.util
-from ai.thinking_engine import ThinkingEngine
-from ai.response_generator import AdaptiveResponseGenerator
-from utils.performance_optimizer import PerformanceOptimizer
+
 
 print("🚀 Butler Voice Assistant - Enhanced Production Mode")
 
@@ -35,6 +33,9 @@ from conversation.memory_manager import MemoryManager
 from conversation.dialog_manager import DialogManager
 from utils.logger import setup_logging
 from utils.feedback_manager import FeedbackManager
+from ai.thinking_engine import ThinkingEngine
+from ai.response_generator import AdaptiveResponseGenerator
+from utils.performance_optimizer import PerformanceOptimizer
 
 class EnhancedProductionButler:
     def __init__(self):
