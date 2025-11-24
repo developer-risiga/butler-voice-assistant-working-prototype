@@ -4,9 +4,11 @@ from gtts import gTTS
 import pygame
 import io
 import logging
+import threading
+import time
 
 class VoiceEngine:
-    """Lightweight voice processing engine"""
+    """Production-ready voice processing engine"""
     
     def __init__(self):
         self.config = None
@@ -15,11 +17,13 @@ class VoiceEngine:
         self.microphone = None
         self.pygame_initialized = False
         self.is_initialized = False
+        self.is_listening = False
+        self.wake_word = "butler"
         
     async def initialize(self, config):
         """Initialize voice components"""
         self.config = config
-        self.logger.info("Initializing lightweight voice engine...")
+        self.logger.info("Initializing production voice engine...")
         
         try:
             # Setup microphone
@@ -33,40 +37,63 @@ class VoiceEngine:
                 self.pygame_initialized = True
             
             self.is_initialized = True
-            self.logger.info("✅ Lightweight voice engine initialized!")
+            self.logger.info("✅ Production voice engine initialized!")
             return True
             
         except Exception as e:
             self.logger.error(f"Voice engine init failed: {e}")
             return False
     
-    async def listen(self) -> str:
-        """Listen for voice input and return text"""
-        if not self.is_initialized:
-            return ""
-            
+    async def wait_for_wake_word(self):
+        """Wait for wake word before listening to commands"""
+        print(f"🔍 Waiting for wake word: '{self.wake_word}'...")
+        
+        while True:
+            try:
+                with self.microphone as source:
+                    print("💤 Sleeping... say 'Butler' to wake me up")
+                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
+                
+                # Convert to text
+                text = self.recognizer.recognize_google(audio).lower()
+                
+                if self.wake_word in text:
+                    print("🎯 Wake word detected!")
+                    await self.speak("Yes? How can I help you?")
+                    return True
+                    
+            except sr.WaitTimeoutError:
+                continue
+            except sr.UnknownValueError:
+                continue
+            except Exception as e:
+                self.logger.debug(f"Wake word listening: {e}")
+                continue
+    
+    async def listen_command(self) -> str:
+        """Listen for a voice command after wake word"""
         try:
-            print("🎤 Listening... (Speak now)")
+            print("🎤 Listening for command... (Speak now)")
             
             with self.microphone as source:
-                audio = self.recognizer.listen(source, timeout=8, phrase_time_limit=5)
+                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=8)
             
-            # Convert speech to text using Google STT (online)
+            # Convert speech to text
             text = self.recognizer.recognize_google(audio)
             
             if text:
-                print(f"🎯 Heard: {text}")
+                print(f"🎯 Command: {text}")
                 return text
             return ""
             
         except sr.WaitTimeoutError:
-            print("⏰ No speech detected")
+            print("⏰ No command detected")
             return ""
         except sr.UnknownValueError:
-            print("❌ Could not understand audio")
+            print("❌ Could not understand command")
             return ""
         except Exception as e:
-            print(f"❌ Listening error: {e}")
+            print(f"❌ Command listening error: {e}")
             return ""
     
     async def speak(self, text: str):
@@ -103,4 +130,4 @@ class VoiceEngine:
             print(f"❌ Text-to-speech error: {e}")
             print(f"Butler (text only): {text}")
 
-print("Lightweight VoiceEngine class defined")
+print("Production VoiceEngine with wake word defined")
