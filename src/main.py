@@ -106,61 +106,61 @@ class WorkingButler:
         except:
             print(f"🔊 Butler: {text}")
     
-   async def process_command(self, user_text: str):
-    """Process a command"""
-    try:
-        print(f"👤 You: {user_text}")
-        
-        # Understand the intent
-        nlu_result = await self.nlu_engine.parse(user_text)
-        intent = nlu_result['intent']
-        entities = nlu_result['entities']
-        print(f"🧠 Intent: {intent}")
-        print(f"📊 Entities: {entities}")
-        
-        # Execute based on intent
-        if intent == "find_service":
-            await self.handle_find_service(entities)
-        elif intent == "book_service":
-            await self.handle_book_service(entities)
-        elif intent == "greet":
-            await self.safe_speak("Hello! How can I assist you today?")
-        else:
-            await self.safe_speak("I can help you find local services like plumbers or electricians. What do you need?")
+    async def process_command(self, user_text: str):
+        """Process a command"""
+        try:
+            print(f"👤 You: {user_text}")
+            
+            # Understand the intent
+            nlu_result = await self.nlu_engine.parse(user_text)
+            intent = nlu_result['intent']
+            entities = nlu_result['entities']
+            print(f"🧠 Intent: {intent}")
+            print(f"📊 Entities: {entities}")
+            
+            # Execute based on intent
+            if intent == "find_service":
+                await self.handle_find_service(entities)
+            elif intent == "book_service":
+                await self.handle_book_service(entities)
+            elif intent == "greet":
+                await self.safe_speak("Hello! How can I assist you today?")
+            else:
+                await self.safe_speak("I can help you find local services like plumbers or electricians. What do you need?")
                 
         except Exception as e:
             print(f"❌ Command processing error: {e}")
             await self.safe_speak("Sorry, I encountered an error. Please try again.")
     
-   async def handle_find_service(self, entities):
-    """Handle service discovery with detected entities"""
-    service_type = entities.get('service_type', 'plumber')
-    location = entities.get('location', 'Bangalore')
+    async def handle_find_service(self, entities):
+        """Handle service discovery with detected entities"""
+        service_type = entities.get('service_type', 'plumber')
+        location = entities.get('location', 'Bangalore')
+        
+        await self.safe_speak(f"Looking for {service_type} services in {location}...")
+        
+        # Find services using detected service type and location
+        result = await self.service_manager.find_services(service_type, location)
+        await self.safe_speak(result['response_text'])
+        
+        # Show results
+        if result['vendors']:
+            print(f"\n📋 Found {service_type} services:")
+            for i, vendor in enumerate(result['vendors'], 1):
+                print(f"   {i}. {vendor['name']} - Rating: {vendor['rating']}★")
     
-    await self.safe_speak(f"Looking for {service_type} services in {location}...")
-    
-    # Find services using detected service type and location
-    result = await self.service_manager.find_services(service_type, location)
-    await self.safe_speak(result['response_text'])
-    
-    # Show results
-    if result['vendors']:
-        print(f"\n📋 Found {service_type} services:")
-        for i, vendor in enumerate(result['vendors'], 1):
-            print(f"   {i}. {vendor['name']} - Rating: {vendor['rating']}★")
-
-async def handle_book_service(self, entities):
-    """Handle service booking with detected entities"""
-    service_type = entities.get('service_type', 'service')
-    
-    await self.safe_speak(f"I'll help you book a {service_type}. Let me check availability...")
-    
-    # Simulate booking
-    context = {'service_type': service_type}
-    result = await self.service_manager.book_service(0, context)
-    await self.safe_speak(result['response_text'])
-    
-    print(f"📅 Booking ID: {result['booking_id']}")
+    async def handle_book_service(self, entities):
+        """Handle service booking with detected entities"""
+        service_type = entities.get('service_type', 'service')
+        
+        await self.safe_speak(f"I'll help you book a {service_type}. Let me check availability...")
+        
+        # Simulate booking
+        context = {'service_type': service_type}
+        result = await self.service_manager.book_service(0, context)
+        await self.safe_speak(result['response_text'])
+        
+        print(f"📅 Booking ID: {result['booking_id']}")
     
     async def shutdown(self):
         """Clean shutdown"""
