@@ -1,3 +1,4 @@
+# config_new.py - Fresh file
 import os
 
 class Config:
@@ -6,5 +7,4 @@ class Config:
         self.VERSION = "1.0.0"
         self.DEBUG = True
         self.DEFAULT_LOCATION = "Bangalore"
-
-print("Config class defined")
+        print("✅ Config class initialized!")
