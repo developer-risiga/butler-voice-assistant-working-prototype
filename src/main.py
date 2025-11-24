@@ -54,30 +54,34 @@ class EnhancedProductionButler:
         self.current_mode = "production"  # "production" or "demo"
         
     async def initialize(self):
-        """Initialize all enhanced production components"""
-        print("🔄 Initializing enhanced production Butler...")
+    """Initialize all enhanced production components"""
+    print("🔄 Initializing enhanced production Butler...")
+    
+    try:
+        # Setup logging
+        setup_logging()
         
-        try:
-            # Setup logging
-            setup_logging()
+        # Initialize components
+        voice_ok = await self.voice_engine.initialize(self.config)
+        nlu_ok = await self.nlu_engine.initialize()
+        service_ok = await self.service_manager.initialize()
+        memory_ok = await self.memory_manager.initialize()
+        recommendation_ok = await self.recommendation_engine.initialize()
+        feedback_ok = await self.feedback_manager.initialize()
+        thinking_ok = await self.thinking_engine.initialize()
+        response_ok = await self.response_generator.initialize()
+        performance_ok = await self.performance_optimizer.initialize()
+        
+        
+        if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
+            print("✅ All enhanced production components initialized!")
+            return True
+        else:
+            print("⚠️ Some components had issues, but continuing...")
+            return True
             
-            # Initialize components
-            voice_ok = await self.voice_engine.initialize(self.config)
-            nlu_ok = await self.nlu_engine.initialize()
-            service_ok = await self.service_manager.initialize()
-            memory_ok = await self.memory_manager.initialize()
-            recommendation_ok = await self.recommendation_engine.initialize()
-            feedback_ok = await self.feedback_manager.initialize()
-            
-            if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok]):
-                print("✅ All enhanced production components initialized!")
-                return True
-            else:
-                print("⚠️ Some components had issues, but continuing...")
-                return True
-                
-        except Exception as e:
-            print(f"❌ Enhanced production initialization error: {e}")
+            except Exception as e:
+                print(f"❌ Enhanced production initialization error: {e}")
             return False
     
     async def start_enhanced_production_mode(self):
