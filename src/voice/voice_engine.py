@@ -12,7 +12,8 @@ class VoiceEngine:
         self.config = None
         self.logger = logging.getLogger("butler.voice")
         self.recognizer = sr.Recognizer()
-        self.microphone = sr.Microphone()
+        self.microphone = None
+        self.pygame_initialized = False
         self.is_initialized = False
         
     async def initialize(self, config):
@@ -22,11 +23,14 @@ class VoiceEngine:
         
         try:
             # Setup microphone
+            self.microphone = sr.Microphone()
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
             
             # Initialize pygame for audio playback
-            pygame.mixer.init()
+            if not self.pygame_initialized:
+                pygame.mixer.init()
+                self.pygame_initialized = True
             
             self.is_initialized = True
             self.logger.info("✅ Lightweight voice engine initialized!")
@@ -38,6 +42,9 @@ class VoiceEngine:
     
     async def listen(self) -> str:
         """Listen for voice input and return text"""
+        if not self.is_initialized:
+            return ""
+            
         try:
             print("🎤 Listening... (Speak now)")
             
@@ -64,7 +71,8 @@ class VoiceEngine:
     
     async def speak(self, text: str):
         """Convert text to speech and play it"""
-        if not text:
+        if not text or not self.is_initialized:
+            print(f"Butler: {text}")
             return
             
         try:
@@ -77,6 +85,11 @@ class VoiceEngine:
             audio_buffer = io.BytesIO()
             tts.write_to_fp(audio_buffer)
             audio_buffer.seek(0)
+            
+            # Ensure pygame is initialized
+            if not self.pygame_initialized:
+                pygame.mixer.init()
+                self.pygame_initialized = True
             
             # Play audio
             pygame.mixer.music.load(audio_buffer)
