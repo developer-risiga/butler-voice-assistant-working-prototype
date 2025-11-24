@@ -180,6 +180,23 @@ class EnhancedProductionButler:
     except Exception as e:
         print(f"❌ AI command processing error: {e}")
         await self.safe_speak("I'm having trouble processing that. Let me try again.")
+
+    async def continue_ai_dialog(self, session_id: str, user_input: str, thinking_result: Dict):
+    """Continue dialog with AI thinking"""
+    dialog_result = await self.dialog_manager.process_user_response(session_id, user_input)
+    
+    if dialog_result.get('completed'):
+        context = dialog_result['context']
+        
+        # 🆕 AI-ENHANCED RESPONSE
+        service_data = {'service_type': context.get('service_type', 'service')}
+        ai_response = await self.response_generator.generate_adaptive_response(
+            thinking_result, service_data, context
+        )
+        
+        await self.safe_speak(ai_response)
+    else:
+        await self.safe_speak(dialog_result['next_prompt'])
     
     async def start_new_conversation(self, session_id: str, user_text: str, context: Dict):
         """Start a new conversation with enhanced features"""
