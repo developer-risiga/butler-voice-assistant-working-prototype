@@ -30,9 +30,9 @@ from utils.logger import setup_logging
 class RealTimeButler:
     def __init__(self):
         self.config = config
-        self.voice_engine = None
-        self.nlu_engine = None
-        self.service_manager = None
+        self.voice_engine = VoiceEngine()
+        self.nlu_engine = NLUEngine()
+        self.service_manager = ServiceManager()
         self.is_running = False
         
     async def initialize(self):
@@ -43,11 +43,6 @@ class RealTimeButler:
         setup_logging()
         
         # Initialize components
-        self.voice_engine = VoiceEngine()
-        self.nlu_engine = NLUEngine()
-        self.service_manager = ServiceManager()
-        
-        # Initialize each component
         await self.voice_engine.initialize(self.config)
         await self.nlu_engine.initialize()
         await self.service_manager.initialize()
@@ -55,12 +50,19 @@ class RealTimeButler:
         print("✅ Real-time Butler initialized!")
         return True
     
-    async def start_listening_loop(self):
-        """Main real-time listening loop"""
+    async def start_voice_interaction(self):
+        """Start voice interaction loop"""
         self.is_running = True
-        print("\n🎧 Butler is now listening in real-time...")
+        
+        print("\n" + "="*50)
+        print("🎧 BUTLER VOICE ASSISTANT - REAL TIME")
+        print("="*50)
         print("💡 Say: 'Hello Butler', 'Find plumbers', or 'Book service'")
-        print("⏹️  Press Ctrl+C to stop\n")
+        print("⏹️  Press Ctrl+C to stop")
+        print("="*50)
+        
+        # Initial greeting
+        await self.voice_engine.speak("Hello! I'm Butler. I'm ready to help you.")
         
         while self.is_running:
             try:
@@ -70,55 +72,56 @@ class RealTimeButler:
                 if user_text and len(user_text.strip()) > 2:
                     # Process the command
                     await self.process_command(user_text)
+                else:
+                    print("💤 Waiting for voice command...")
                     
-                await asyncio.sleep(0.1)  # Small delay to prevent CPU overload
+                await asyncio.sleep(1)
                 
             except KeyboardInterrupt:
                 print("\n🛑 Stopping Butler...")
                 self.is_running = False
             except Exception as e:
-                print(f"❌ Error in main loop: {e}")
+                print(f"❌ Error: {e}")
                 await asyncio.sleep(1)
     
     async def process_command(self, user_text: str):
         """Process a voice command"""
         try:
-            print(f"\n👤 User: {user_text}")
+            print(f"\n👤 You said: {user_text}")
             
             # Understand the intent
             nlu_result = await self.nlu_engine.parse(user_text)
-            print(f"🧠 Intent: {nlu_result['intent']}")
+            intent = nlu_result['intent']
+            print(f"🧠 Intent detected: {intent}")
             
             # Execute based on intent
-            if nlu_result['intent'] == "find_service":
-                await self.handle_find_service(nlu_result)
-            elif nlu_result['intent'] == "book_service":
-                await self.handle_book_service(nlu_result)
-            elif nlu_result['intent'] == "greet":
-                await self.voice_engine.speak("Hello! I'm Butler. How can I help you today?")
+            if intent == "find_service":
+                await self.handle_find_service()
+            elif intent == "book_service":
+                await self.handle_book_service()
+            elif intent == "greet":
+                await self.voice_engine.speak("Hello! How can I assist you today?")
             else:
-                await self.voice_engine.speak("I can help you find local services like plumbers or electricians.")
+                await self.voice_engine.speak("I can help you find local services like plumbers or electricians. Just tell me what you need!")
                 
         except Exception as e:
             print(f"❌ Command processing error: {e}")
-            await self.voice_engine.speak("Sorry, I encountered an error. Please try again.")
+            await self.voice_engine.speak("Sorry, I didn't understand that. Please try again.")
     
-    async def handle_find_service(self, nlu_result):
+    async def handle_find_service(self):
         """Handle service discovery"""
-        service_type = "plumber"  # Default
-        location = "Bangalore"    # Default
-        
-        response = f"Looking for {service_type} services in {location}..."
-        await self.voice_engine.speak(response)
+        await self.voice_engine.speak("Looking for plumber services in Bangalore...")
         
         # Find services
-        result = await self.service_manager.find_services(service_type, location)
+        result = await self.service_manager.find_services("plumber", "Bangalore")
         await self.voice_engine.speak(result['response_text'])
+        
+        # Offer booking
+        await self.voice_engine.speak("You can say 'Book the first one' to make a booking.")
     
-    async def handle_book_service(self, nlu_result):
+    async def handle_book_service(self):
         """Handle service booking"""
-        response = "I'll help you book that service..."
-        await self.voice_engine.speak(response)
+        await self.voice_engine.speak("Booking the service for you...")
         
         # Simulate booking
         result = await self.service_manager.book_service(0, {})
@@ -127,6 +130,7 @@ class RealTimeButler:
     async def shutdown(self):
         """Clean shutdown"""
         self.is_running = False
+        await self.voice_engine.speak("Goodbye!")
         print("🔚 Butler shutdown complete")
 
 async def main():
@@ -140,8 +144,8 @@ async def main():
             print("❌ Initialization failed!")
             return
         
-        # Start real-time listening
-        await butler.start_listening_loop()
+        # Start real-time voice interaction
+        await butler.start_voice_interaction()
         
     except Exception as e:
         print(f"💥 Butler crashed: {e}")
