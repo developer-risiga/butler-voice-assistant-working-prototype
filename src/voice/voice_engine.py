@@ -10,7 +10,7 @@ class VoiceEngine:
     """Real voice processing engine"""
     
     def __init__(self):
-        self.config = None  # Will be set from main
+        self.config = None
         self.logger = logging.getLogger("butler.voice")
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
@@ -27,11 +27,11 @@ class VoiceEngine:
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
             
-            # Load Whisper model (works offline)
+            # Load Whisper model
             self.logger.info("Loading Whisper model...")
             self.whisper_model = whisper.load_model("base")
             
-            # Initialize pygame for audio playback
+            # Initialize pygame
             pygame.mixer.init()
             
             self.is_initialized = True
@@ -45,42 +45,39 @@ class VoiceEngine:
     async def listen(self) -> str:
         """Listen for voice input and return text"""
         try:
-            self.logger.info("🎤 Listening...")
+            print("🎤 Listening... (Speak now)")
             
             with self.microphone as source:
-                # Listen for audio with timeout
-                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=8)
+                audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=5)
             
-            # Convert speech to text using Whisper
+            # Convert speech to text
             text = await self.speech_to_text(audio)
             return text
             
         except sr.WaitTimeoutError:
-            self.logger.info("No speech detected")
+            print("⏰ No speech detected")
             return ""
         except Exception as e:
-            self.logger.error(f"Listening error: {e}")
+            print(f"❌ Listening error: {e}")
             return ""
     
     async def speech_to_text(self, audio) -> str:
         """Convert speech to text using Whisper"""
         try:
-            # Convert audio to numpy array for Whisper
             import numpy as np
             audio_data = np.frombuffer(audio.get_raw_data(), dtype=np.int16)
             audio_data = audio_data.astype(np.float32) / 32768.0
             
-            # Transcribe using Whisper
             result = self.whisper_model.transcribe(audio_data)
             text = result["text"].strip()
             
             if text:
-                self.logger.info(f"🎯 Heard: {text}")
+                print(f"🎯 Heard: {text}")
                 return text
             return ""
             
         except Exception as e:
-            self.logger.error(f"Speech-to-text error: {e}")
+            print(f"❌ Speech-to-text error: {e}")
             return ""
     
     async def speak(self, text: str):
@@ -89,12 +86,12 @@ class VoiceEngine:
             return
             
         try:
-            self.logger.info(f"🔊 Speaking: {text}")
+            print(f"🔊 Butler: {text}")
             
             # Use Google TTS
             tts = gTTS(text=text, lang='en', slow=False)
             
-            # Save to in-memory buffer
+            # Save to buffer
             audio_buffer = io.BytesIO()
             tts.write_to_fp(audio_buffer)
             audio_buffer.seek(0)
@@ -103,13 +100,12 @@ class VoiceEngine:
             pygame.mixer.music.load(audio_buffer)
             pygame.mixer.music.play()
             
-            # Wait for playback to complete
+            # Wait for playback
             while pygame.mixer.music.get_busy():
                 await asyncio.sleep(0.1)
                 
         except Exception as e:
-            self.logger.error(f"Text-to-speech error: {e}")
-            # Fallback to print
-            print(f"Butler: {text}")
+            print(f"❌ Text-to-speech error: {e}")
+            print(f"Butler (text only): {text}")
 
 print("Real VoiceEngine class defined")
