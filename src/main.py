@@ -47,6 +47,9 @@ class EnhancedProductionButler:
         self.memory_manager = MemoryManager(config)
         self.dialog_manager = DialogManager()
         self.feedback_manager = FeedbackManager(config)
+        self.thinking_engine = ThinkingEngine()
+        self.response_generator = AdaptiveResponseGenerator()
+        self.performance_optimizer = PerformanceOptimizer(config)
         self.is_running = False
         self.current_mode = "production"  # "production" or "demo"
         
