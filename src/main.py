@@ -1,81 +1,75 @@
 #!/usr/bin/env python3
 """
-Butler Voice Assistant - Fixed Import Version
+Butler Voice Assistant - Alternative Import Method
 """
 import os
 import sys
+import importlib.util
 
-print("🚀 Butler Voice Assistant - Testing Imports")
+print("🚀 Butler - Testing Alternative Import")
 
-# Fix Python path - Add the src directory to path
+# Get current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_dir = current_dir  # src folder
-project_root = os.path.dirname(current_dir)  # project root folder
+config_path = os.path.join(current_dir, "config", "config.py")
 
-print(f"📁 Current directory: {current_dir}")
-print(f"📁 Project root: {project_root}")
+print(f"📁 Config path: {config_path}")
+print(f"📁 File exists: {os.path.exists(config_path)}")
 
-# Add both paths to Python path
-sys.path.insert(0, src_dir)
-sys.path.insert(0, project_root)
-
-print(f"🔧 Python path includes: {sys.path}")
-
+# Method 1: Direct file import (bypasses Python cache)
 try:
-    print("1. Testing config import...")
+    print("\n🔄 Method 1: Direct file import...")
+    spec = importlib.util.spec_from_file_location("config_module", config_path)
+    config_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_module)
     
-    # Try different import methods
-    try:
-        from config.config import Config
-        print("✅ SUCCESS: Imported using 'from config.config import Config'")
-    except ImportError:
-        try:
-            from src.config.config import Config
-            print("✅ SUCCESS: Imported using 'from src.config.config import Config'")
-        except ImportError:
-            # Direct import
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("config", os.path.join(current_dir, "config", "config.py"))
-            config_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(config_module)
-            Config = config_module.Config
-            print("✅ SUCCESS: Imported using direct file load")
+    # Check what's in the module
+    print("📋 Module contents:")
+    for attr in dir(config_module):
+        if not attr.startswith('__'):
+            value = getattr(config_module, attr)
+            print(f"   {attr}: {type(value)}")
     
-    print("2. Creating config object...")
+    if hasattr(config_module, 'Config'):
+        Config = config_module.Config
+        config = Config()
+        print(f"✅ SUCCESS! App: {config.APP_NAME}")
+    else:
+        print("❌ Config class not found in module")
+        
+except Exception as e:
+    print(f"❌ Method 1 failed: {e}")
+
+# Method 2: Import from different path
+try:
+    print("\n🔄 Method 2: Import from parent directory...")
+    parent_dir = os.path.dirname(current_dir)
+    sys.path.insert(0, parent_dir)
+    
+    from src.config.config import Config
     config = Config()
-    print("✅ SUCCESS: Config object created!")
-    
-    print("3. Testing other imports...")
-    from utils.logger import setup_logging
-    print("✅ SUCCESS: Logger imported!")
-    
-    print("🎉 ALL IMPORTS WORKING! BUTLER IS READY! 🎉")
-    print(f"📱 App: {config.APP_NAME}")
-    print(f"🔢 Version: {config.VERSION}")
-    print(f"📍 Location: {config.DEFAULT_LOCATION}")
-    
-    input("Press Enter to start development...")
+    print(f"✅ SUCCESS! App: {config.APP_NAME}")
     
 except Exception as e:
-    print(f"❌ ERROR: {e}")
-    print("Let me debug the issue...")
+    print(f"❌ Method 2 failed: {e}")
+
+# Method 3: Execute the file directly
+try:
+    print("\n🔄 Method 3: Execute file directly...")
+    with open(config_path, 'r') as f:
+        code = f.read()
     
-    # Check if files exist
-    config_path = os.path.join(current_dir, "config", "config.py")
-    logger_path = os.path.join(current_dir, "utils", "logger.py")
+    # Create a temporary namespace
+    namespace = {}
+    exec(code, namespace)
     
-    print(f"📄 Config file exists: {os.path.exists(config_path)}")
-    print(f"📄 Logger file exists: {os.path.exists(logger_path)}")
-    
-    # List all Python files in src
-    print("📁 Files in src directory:")
-    for root, dirs, files in os.walk(current_dir):
-        level = root.replace(current_dir, '').count(os.sep)
-        indent = ' ' * 2 * level
-        print(f'{indent}{os.path.basename(root)}/')
-        subindent = ' ' * 2 * (level + 1)
-        for file in files:
-            if file.endswith('.py'):
-                print(f'{subindent}{file}')
-    
-    input("Press Enter to exit...")
+    if 'Config' in namespace:
+        Config = namespace['Config']
+        config = Config()
+        print(f"✅ SUCCESS! App: {config.APP_NAME}")
+    else:
+        print("❌ Config not found in executed code")
+        
+except Exception as e:
+    print(f"❌ Method 3 failed: {e}")
+
+input("\nPress Enter to exit...")
