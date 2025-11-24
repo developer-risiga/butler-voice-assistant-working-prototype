@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Butler Voice Assistant - Stable Working Version
+Butler Voice Assistant - Production Ready Version
 """
 import os
 import sys
 import asyncio
 import importlib.util
 
-print("🚀 Butler Voice Assistant - Starting...")
+print("🚀 Butler Voice Assistant - Production Mode")
 
 # Import all components
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -23,23 +23,25 @@ config = Config()
 
 print(f"✅ {config.APP_NAME} v{config.VERSION}")
 
-# Import other components
+# Import production components
 from voice.voice_engine import VoiceEngine
 from nlu.nlu_engine import NLUEngine
 from services.service_manager import ServiceManager
+from conversation.memory_manager import MemoryManager
 from utils.logger import setup_logging
 
-class WorkingButler:
+class ProductionButler:
     def __init__(self):
         self.config = config
         self.voice_engine = VoiceEngine()
         self.nlu_engine = NLUEngine()
         self.service_manager = ServiceManager()
+        self.memory_manager = MemoryManager(config)
         self.is_running = False
         
     async def initialize(self):
-        """Initialize all components"""
-        print("🔄 Initializing Butler components...")
+        """Initialize all production components"""
+        print("🔄 Initializing production Butler...")
         
         try:
             # Setup logging
@@ -49,55 +51,98 @@ class WorkingButler:
             voice_ok = await self.voice_engine.initialize(self.config)
             nlu_ok = await self.nlu_engine.initialize()
             service_ok = await self.service_manager.initialize()
+            memory_ok = await self.memory_manager.initialize()
             
-            if voice_ok and nlu_ok and service_ok:
-                print("✅ All components initialized successfully!")
+            if all([voice_ok, nlu_ok, service_ok, memory_ok]):
+                print("✅ All production components initialized!")
                 return True
             else:
                 print("⚠️ Some components had issues, but continuing...")
                 return True
                 
         except Exception as e:
-            print(f"❌ Initialization error: {e}")
+            print(f"❌ Production initialization error: {e}")
             return False
     
-    async def start_interaction(self):
-        """Start interaction loop"""
+    async def start_production_mode(self):
+        """Start production interaction loop"""
         self.is_running = True
         
         print("\n" + "="*50)
-        print("🤖 BUTLER VOICE ASSISTANT - READY")
+        print("🏭 BUTLER VOICE ASSISTANT - PRODUCTION MODE")
         print("="*50)
-        print("💡 Available commands:")
-        print("   - 'hello' or 'hi'")
-        print("   - 'find plumbers' or 'need electrician'")
-        print("   - 'book service' or 'make appointment'")
-        print("   - 'quit' to exit")
+        print("💡 Say 'Butler' to activate, then your command")
+        print("📋 Available services: plumbers, electricians, carpenters, etc.")
+        print("⏹️  Say 'goodbye' or press Ctrl+C to exit")
         print("="*50)
         
-        # Greeting
-        await self.safe_speak("Hello! I'm Butler. How can I help you today?")
+        await self.safe_speak("Butler is ready. Say Butler to get my attention.")
         
         while self.is_running:
             try:
-                # Try voice input first
-                user_text = await self.voice_engine.listen()
+                # Wait for wake word
+                wake_detected = await self.voice_engine.wait_for_wake_word()
                 
-                # If no voice input, use text input as fallback
-                if not user_text:
-                    user_text = input("\n👤 Type your command (or 'quit'): ").strip()
-                
-                if user_text.lower() in ['quit', 'exit', 'bye']:
-                    break
+                if wake_detected:
+                    # Get command after wake word
+                    user_text = await self.voice_engine.listen_command()
                     
-                if user_text:
-                    await self.process_command(user_text)
+                    if user_text and user_text.lower() not in ['goodbye', 'bye', 'exit']:
+                        await self.process_production_command(user_text)
+                    else:
+                        await self.safe_speak("Goodbye! Have a great day!")
+                        break
                     
             except KeyboardInterrupt:
                 print("\n🛑 Stopping Butler...")
                 break
             except Exception as e:
-                print(f"❌ Error: {e}")
+                print(f"❌ Production error: {e}")
+                await asyncio.sleep(1)
+    
+    async def process_production_command(self, user_text: str):
+        """Process a command with memory and context"""
+        try:
+            print(f"👤 You: {user_text}")
+            
+            # Get current context
+            context = await self.memory_manager.get_context()
+            
+            # Understand the intent
+            nlu_result = await self.nlu_engine.parse(user_text)
+            intent = nlu_result['intent']
+            entities = nlu_result['entities']
+            
+            print(f"🧠 Intent: {intent}")
+            print(f"📊 Entities: {entities}")
+            print(f"💾 Context: {context['session']['current_service']}")
+            
+            # Execute based on intent
+            if intent == "find_service":
+                response = await self.handle_find_service(entities, context)
+            elif intent == "book_service":
+                response = await self.handle_book_service(entities, context)
+            elif intent == "greet":
+                response = "Hello! How can I assist you today?"
+            elif intent == "thanks":
+                response = "You're welcome! Is there anything else I can help with?"
+            else:
+                response = "I can help you find local services. What do you need?"
+            
+            # Speak response
+            await self.safe_speak(response)
+            
+            # Update conversation memory
+            await self.memory_manager.update_conversation(user_text, response, intent, entities)
+            
+            # Check if session should be restarted
+            if await self.memory_manager.should_restart_session():
+                await self.memory_manager.restart_session()
+                await self.safe_speak("Starting fresh conversation. How can I help you?")
+                
+        except Exception as e:
+            print(f"❌ Command processing error: {e}")
+            await self.safe_speak("Sorry, I encountered an error. Please try again.")
     
     async def safe_speak(self, text: str):
         """Safely speak text with error handling"""
@@ -106,84 +151,56 @@ class WorkingButler:
         except:
             print(f"🔊 Butler: {text}")
     
-    async def process_command(self, user_text: str):
-        """Process a command"""
-        try:
-            print(f"👤 You: {user_text}")
-            
-            # Understand the intent
-            nlu_result = await self.nlu_engine.parse(user_text)
-            intent = nlu_result['intent']
-            entities = nlu_result['entities']
-            print(f"🧠 Intent: {intent}")
-            print(f"📊 Entities: {entities}")
-            
-            # Execute based on intent
-            if intent == "find_service":
-                await self.handle_find_service(entities)
-            elif intent == "book_service":
-                await self.handle_book_service(entities)
-            elif intent == "greet":
-                await self.safe_speak("Hello! How can I assist you today?")
-            else:
-                await self.safe_speak("I can help you find local services like plumbers or electricians. What do you need?")
-                
-        except Exception as e:
-            print(f"❌ Command processing error: {e}")
-            await self.safe_speak("Sorry, I encountered an error. Please try again.")
-    
-    async def handle_find_service(self, entities):
-        """Handle service discovery with detected entities"""
+    async def handle_find_service(self, entities: Dict, context: Dict) -> str:
+        """Handle service discovery with context"""
         service_type = entities.get('service_type', 'plumber')
         location = entities.get('location', 'Bangalore')
         
-        await self.safe_speak(f"Looking for {service_type} services in {location}...")
-        
-        # Find services using detected service type and location
+        # Find services
         result = await self.service_manager.find_services(service_type, location)
-        await self.safe_speak(result['response_text'])
         
-        # Show results
+        # Build detailed response
+        response = f"Found {len(result['vendors'])} {service_type} services in {location}. "
+        
         if result['vendors']:
-            print(f"\n📋 Found {service_type} services:")
-            for i, vendor in enumerate(result['vendors'], 1):
-                print(f"   {i}. {vendor['name']} - Rating: {vendor['rating']}★")
+            best_vendor = result['vendors'][0]
+            response += f"The top rated is {best_vendor['name']} with {best_vendor['rating']} stars. "
+            response += f"You can say 'book the first one' to make a booking."
+        
+        return response
     
-    async def handle_book_service(self, entities):
-        """Handle service booking with detected entities"""
+    async def handle_book_service(self, entities: Dict, context: Dict) -> str:
+        """Handle service booking with context"""
         service_type = entities.get('service_type', 'service')
         
-        await self.safe_speak(f"I'll help you book a {service_type}. Let me check availability...")
-        
         # Simulate booking
-        context = {'service_type': service_type}
-        result = await self.service_manager.book_service(0, context)
-        await self.safe_speak(result['response_text'])
+        result = await self.service_manager.book_service(0, {'service_type': service_type})
         
-        print(f"📅 Booking ID: {result['booking_id']}")
+        return result['response_text']
     
     async def shutdown(self):
         """Clean shutdown"""
         self.is_running = False
-        await self.safe_speak("Goodbye! Have a great day!")
-        print("\n🔚 Butler shutdown complete")
+        await self.service_manager.shutdown()
+        await self.safe_speak("Butler is shutting down. Goodbye!")
+        print("\n🔚 Production Butler shutdown complete")
 
 async def main():
     """Main entry point"""
-    butler = WorkingButler()
+    butler = ProductionButler()
     
     try:
         # Initialize
         success = await butler.initialize()
         if not success:
-            print("❌ Butler initialization failed!")
+            print("❌ Production Butler initialization failed!")
             return
         
-        # Start interaction
-        await butler.start_interaction()
+        # Start production mode
+        await butler.start_production_mode()
         
     except Exception as e:
-        print(f"💥 Butler crashed: {e}")
+        print(f"💥 Production Butler crashed: {e}")
     finally:
         await butler.shutdown()
 
