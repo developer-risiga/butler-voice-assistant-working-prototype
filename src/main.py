@@ -139,28 +139,47 @@ class EnhancedProductionButler:
                 print(f"❌ Enhanced production error: {e}")
                 await asyncio.sleep(1)
     
-    async def process_enhanced_command(self, user_text: str):
-        """Process a command with all enhanced features"""
-        try:
-            print(f"👤 You: {user_text}")
-            
-            # Get current context
-            context = await self.memory_manager.get_context()
-            session_id = context['session']['session_id']
-            
-            # Check if we're in an active dialog
-            dialog_context = await self.dialog_manager.get_dialog_context(session_id)
-            
-            if dialog_context and not dialog_context.get('completed', True):
-                # Continue existing dialog
-                await self.continue_dialog(session_id, user_text)
-            else:
-                # Start new conversation
-                await self.start_new_conversation(session_id, user_text, context)
+   async def process_enhanced_command(self, user_text: str):
+    """Process command with real AI thinking"""
+    try:
+        print(f"👤 You: {user_text}")
+        
+        # 🆕 START PERFORMANCE MONITORING
+        start_time = time.time()
+        
+        # Get current context
+        context = await self.memory_manager.get_context()
+        session_id = context['session']['session_id']
+        
+        # 🆕 AI THINKING PROCESS
+        thinking_result = await self.thinking_engine.process_thinking(user_text, context)
+        print(f"💭 Thinking: {thinking_result['thinking_process']}")
+        
+        # 🆕 GENERATE THINKING FEEDBACK
+        thinking_feedback = await self.response_generator.generate_thinking_feedback(thinking_result)
+        await self.safe_speak(thinking_feedback)
+        
+        # Continue with existing logic but with AI-enhanced responses
+        dialog_context = await self.dialog_manager.get_dialog_context(session_id)
+        
+        if dialog_context and not dialog_context.get('completed', True):
+            await self.continue_ai_dialog(session_id, user_text, thinking_result)
+        else:
+            await self.start_ai_conversation(session_id, user_text, context, thinking_result)
+        
+        # 🆕 RECORD PERFORMANCE METRICS
+        response_time = time.time() - start_time
+        await self.performance_optimizer.record_interaction(
+            response_time, user_text, "AI response generated"
+        )
+        
+        # 🆕 PERFORMANCE FEEDBACK
+        if await self.performance_optimizer.should_simplify_responses():
+            self.logger.info("⚡ Performance mode: simplifying responses")
                 
-        except Exception as e:
-            print(f"❌ Enhanced command processing error: {e}")
-            await self.safe_speak("Sorry, I encountered an error. Please try again.")
+    except Exception as e:
+        print(f"❌ AI command processing error: {e}")
+        await self.safe_speak("I'm having trouble processing that. Let me try again.")
     
     async def start_new_conversation(self, session_id: str, user_text: str, context: Dict):
         """Start a new conversation with enhanced features"""
