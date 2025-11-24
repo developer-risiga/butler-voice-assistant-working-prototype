@@ -3,12 +3,14 @@ python>=3.8
 
 # Voice Processing
 SpeechRecognition==3.10.0
+python-dotenv==1.0.0
 PyAudio==0.2.11
 pvporcupine==3.0.0
 openai-whisper==20231117
 pygame==2.5.0
 gTTS==2.3.2
 pydub==0.25.1
+openai-whisper==20231117
 
 # AI & ML
 rasa==3.6.15
