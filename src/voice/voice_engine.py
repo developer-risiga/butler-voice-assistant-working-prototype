@@ -6,9 +6,15 @@ import io
 import logging
 import threading
 import time
+import os
+from elevenlabs import ElevenLabs, play
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class VoiceEngine:
-    """Production-ready voice processing engine"""
+    """Production-ready voice processing engine with ElevenLabs integration"""
     
     def __init__(self):
         self.config = None
@@ -20,10 +26,23 @@ class VoiceEngine:
         self.is_listening = False
         self.wake_word = "butler"
         
+        # ElevenLabs Configuration
+        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
+        self.use_elevenlabs = True if self.elevenlabs_api_key else False
+        self.elevenlabs_client = None
+        self.voice_profiles = {
+            "butler_default": "VR6AewLTigWG4xSOukaG",  # ElevenLabs Josh voice
+            "butler_premium": "21m00Tcm4TlvDq8ikWAM",   # Rachel voice
+            "professional": "pNInz6obpgDQGcFmaJgB"     # Adam voice
+        }
+        self.current_voice = "butler_default"
+        self.monthly_char_count = 0
+        self.char_limit = 10000  # Free tier limit
+        
     async def initialize(self, config):
-        """Initialize voice components"""
+        """Initialize voice components with ElevenLabs"""
         self.config = config
-        self.logger.info("Initializing production voice engine...")
+        self.logger.info("Initializing production voice engine with ElevenLabs...")
         
         try:
             # Setup microphone
@@ -31,10 +50,27 @@ class VoiceEngine:
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
             
-            # Initialize pygame for audio playback
+            # Initialize pygame for audio playback (fallback)
             if not self.pygame_initialized:
                 pygame.mixer.init()
                 self.pygame_initialized = True
+            
+            # Initialize ElevenLabs client
+            if self.use_elevenlabs and self.elevenlabs_api_key:
+                try:
+                    self.elevenlabs_client = ElevenLabs(api_key=self.elevenlabs_api_key)
+                    self.logger.info("✅ ElevenLabs client initialized!")
+                    
+                    # Test the connection
+                    voices = self.elevenlabs_client.voices.get_all()
+                    self.logger.info(f"🎵 Available ElevenLabs voices: {len(voices.voices)}")
+                    
+                except Exception as e:
+                    self.logger.warning(f"❌ ElevenLabs init failed, using fallback TTS: {e}")
+                    self.use_elevenlabs = False
+            else:
+                self.logger.warning("ElevenLabs API key not found, using Google TTS")
+                self.use_elevenlabs = False
             
             self.is_initialized = True
             self.logger.info("✅ Production voice engine initialized!")
@@ -96,8 +132,8 @@ class VoiceEngine:
             print(f"❌ Command listening error: {e}")
             return ""
     
-    async def speak(self, text: str):
-        """Convert text to speech and play it"""
+    async def speak(self, text: str, use_elevenlabs: bool = None):
+        """Convert text to speech using ElevenLabs or fallback to Google TTS"""
         if not text or not self.is_initialized:
             print(f"Butler: {text}")
             return
@@ -105,6 +141,61 @@ class VoiceEngine:
         try:
             print(f"🔊 Butler: {text}")
             
+            # Determine if we should use ElevenLabs
+            should_use_elevenlabs = use_elevenlabs if use_elevenlabs is not None else self.use_elevenlabs
+            
+            # Check character limit for ElevenLabs
+            if should_use_elevenlabs and self.elevenlabs_client:
+                if self.monthly_char_count + len(text) > self.char_limit:
+                    self.logger.warning("ElevenLabs character limit reached, using fallback")
+                    should_use_elevenlabs = False
+            
+            # Use ElevenLabs for premium voice
+            if should_use_elevenlabs and self.elevenlabs_client:
+                await self._speak_elevenlabs(text)
+            else:
+                # Fallback to Google TTS
+                await self._speak_google_tts(text)
+                
+        except Exception as e:
+            print(f"❌ Text-to-speech error: {e}")
+            # Ultimate fallback - just print text
+            print(f"Butler (text only): {text}")
+    
+    async def _speak_elevenlabs(self, text: str):
+        """Use ElevenLabs for high-quality voice generation"""
+        try:
+            # Update character count
+            self.monthly_char_count += len(text)
+            
+            # Generate audio with ElevenLabs
+            audio = self.elevenlabs_client.text_to_speech.convert(
+                voice_id=self.voice_profiles[self.current_voice],
+                text=text,
+                model_id="eleven_monolingual_v1",
+                voice_settings={
+                    "stability": 0.3,
+                    "similarity_boost": 0.8
+                }
+            )
+            
+            # Play audio in a separate thread to avoid blocking
+            def play_audio():
+                play(audio)
+            
+            # Run in thread pool to avoid blocking async loop
+            await asyncio.get_event_loop().run_in_executor(None, play_audio)
+            
+            self.logger.info(f"🎵 ElevenLabs speech: {len(text)} chars (Total: {self.monthly_char_count}/{self.char_limit})")
+            
+        except Exception as e:
+            self.logger.error(f"ElevenLabs TTS failed: {e}")
+            # Fallback to Google TTS
+            await self._speak_google_tts(text)
+    
+    async def _speak_google_tts(self, text: str):
+        """Fallback to Google TTS"""
+        try:
             # Use Google TTS
             tts = gTTS(text=text, lang='en', slow=False)
             
@@ -127,7 +218,47 @@ class VoiceEngine:
                 await asyncio.sleep(0.1)
                 
         except Exception as e:
-            print(f"❌ Text-to-speech error: {e}")
-            print(f"Butler (text only): {text}")
+            print(f"❌ Google TTS error: {e}")
+            raise
+    
+    def set_voice_style(self, style: str = "butler_default"):
+        """Change the ElevenLabs voice style"""
+        if style in self.voice_profiles:
+            self.current_voice = style
+            self.logger.info(f"🎭 Voice style changed to: {style}")
+        else:
+            self.logger.warning(f"Voice style '{style}' not found, using default")
+    
+    def update_voice_settings(self, stability: float = 0.3, similarity_boost: float = 0.8):
+        """Update ElevenLabs voice settings for emotional control"""
+        self.voice_settings = {
+            "stability": stability,  # Lower = more emotional/expressive
+            "similarity_boost": similarity_boost  # Higher = closer to original voice
+        }
+    
+    def get_usage_stats(self) -> dict:
+        """Get ElevenLabs usage statistics"""
+        return {
+            "characters_used": self.monthly_char_count,
+            "character_limit": self.char_limit,
+            "remaining_chars": max(0, self.char_limit - self.monthly_char_count),
+            "using_elevenlabs": self.use_elevenlabs,
+            "current_voice": self.current_voice
+        }
+    
+    def list_available_voices(self):
+        """List all available ElevenLabs voices"""
+        if self.elevenlabs_client:
+            try:
+                voices = self.elevenlabs_client.voices.get_all()
+                print("\n🎵 Available ElevenLabs Voices:")
+                for voice in voices.voices:
+                    print(f"  - {voice.name}: {voice.voice_id}")
+                return voices.voices
+            except Exception as e:
+                print(f"❌ Failed to fetch voices: {e}")
+        else:
+            print("❌ ElevenLabs client not initialized")
+        return []
 
-print("Production VoiceEngine with wake word defined")
+print("Enhanced VoiceEngine with ElevenLabs integration defined")
