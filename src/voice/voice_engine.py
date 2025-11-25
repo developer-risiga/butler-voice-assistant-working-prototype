@@ -6,8 +6,12 @@ import pygame
 import io
 import logging
 import os
+from dotenv import load_dotenv
 import tempfile
 import sys
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ElevenLabs imports with proper error handling
 try:
@@ -61,7 +65,7 @@ class VoiceEngine:
         self.is_listening = False
         self.wake_word = "butler"
 
-        # ElevenLabs Configuration: read API key from env (do NOT hardcode)
+        # ElevenLabs Configuration: read API key from .env file
         self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY", "")
         self.use_elevenlabs = ELEVENLABS_AVAILABLE and bool(self.elevenlabs_api_key)
         self.elevenlabs_client = None
