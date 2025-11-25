@@ -51,7 +51,7 @@ class DialogManager:
         
         return prompts.get(current_step, "How can I help you?")
     
-    async process_user_response(self, session_id: str, user_input: str) -> Dict[str, Any]:
+    async def process_user_response(self, session_id: str, user_input: str) -> Dict[str, Any]:
         """Process user response and move to next step"""
         if session_id not in self.active_dialogs:
             return {'error': 'No active dialog'}
