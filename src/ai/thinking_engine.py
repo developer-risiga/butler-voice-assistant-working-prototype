@@ -14,7 +14,7 @@ class ThinkingEngine:
         self.decision_history = []
         
     async def initialize(self):
-        self.logger.info("🤔 Thinking engine initialized")
+        self.logger.info("[THINK] Thinking engine initialized")
         return True
     
     async def process_thinking(self, user_input: str, context: Dict) -> Dict[str, Any]:
@@ -250,3 +250,4 @@ class ThinkingEngine:
         self.logger.info(f"📚 Updated user profile: {self.user_profile}")
 
 print("🤔 ThinkingEngine class defined")
+
