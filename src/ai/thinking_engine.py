@@ -249,5 +249,6 @@ class ThinkingEngine:
         
         self.logger.info(f"📚 Updated user profile: {self.user_profile}")
 
-print("🤔 ThinkingEngine class defined")
+print("[THINK] ThinkingEngine class defined")
+
 
