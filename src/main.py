@@ -56,15 +56,25 @@ class EnhancedProductionButler:
         self.response_generator = AdaptiveResponseGenerator()
         self.performance_optimizer = PerformanceOptimizer(config)
         self.is_running = False
-        self.current_mode = "production"  # "production" or "demo"
+        self.current_mode = "production"
         self.logger = logging.getLogger("butler.main")
+        
+        # NEW: Import and initialize real conversation engines
+        from real_conversation_engine import RealConversationEngine
+        from human_response_generator import HumanResponseGenerator
+        from real_service_scenarios import RealServiceScenarios
+        
+        self.real_conversation_engine = RealConversationEngine()
+        self.human_response_generator = HumanResponseGenerator()
+        self.service_scenarios = RealServiceScenarios()
+        self.conversation_history = []
         
     async def initialize(self):
         """Initialize all enhanced production components"""
         self.logger.info("[SYNC] Initializing enhanced production Butler...")
         
         try:
-            # Initialize components - they will use the centrally configured logging
+            # Initialize components
             voice_ok = await self.voice_engine.initialize(self.config)
             nlu_ok = await self.nlu_engine.initialize()
             service_ok = await self.service_manager.initialize()
@@ -75,7 +85,11 @@ class EnhancedProductionButler:
             response_ok = await self.response_generator.initialize()
             performance_ok = await self.performance_optimizer.initialize()
             
-            # Use text-based logging for initialization status
+            # NEW: Initialize real conversation components
+            conversation_ok = await self.real_conversation_engine.initialize()
+            human_response_ok = await self.human_response_generator.initialize()
+            scenarios_ok = await self.service_scenarios.initialize()
+            
             if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
                 self.logger.info("[OK] All enhanced production components initialized!")
                 return True
@@ -88,26 +102,21 @@ class EnhancedProductionButler:
             return False
     
     async def start_enhanced_production_mode(self):
-        """Start enhanced production interaction loop"""
+        """Start REAL conversation mode (replaces demo mode)"""
         self.is_running = True
         self.current_mode = "production"
         
         print("\n" + "="*60)
-        print("[FACTORY] BUTLER VOICE ASSISTANT - ENHANCED PRODUCTION MODE")
+        print("🎙️  BUTLER - REAL CONVERSATION MODE")
         print("="*60)
-        print("[IDEA] Enhanced Features:")
-        print("   - Multi-step conversations")
-        print("   - Smart vendor recommendations") 
-        print("   - Vendor comparisons & detailed info")
-        print("   - Conversation memory & context")
-        print("   - User feedback collection")
-        print("="*60)
-        print("[MIC] Say 'Butler' to activate, then your command")
-        print("[CLIPBOARD] Say 'demo mode' for feature showcase")
-        print("[STOP] Say 'goodbye' or press Ctrl+C to exit")
+        print("💬 Now speaking like a human assistant")
+        print("🛠️  Ready to handle real service requests")
+        print("📍 Say 'Butler' then your service need")
+        print("⏹️  Say 'goodbye' or press Ctrl+C to exit")
         print("="*60)
         
-        await self.safe_speak("Enhanced Butler is ready! Say Butler to begin, or demo mode for a feature showcase.")
+        # NEW: Real greeting instead of demo announcement
+        await self.safe_speak("Hello! I'm Butler, your personal service assistant. I'm ready to help you find reliable service professionals. Just say 'Butler' followed by what you need!")
         
         while self.is_running:
             try:
@@ -115,7 +124,7 @@ class EnhancedProductionButler:
                 wake_detected = await self.voice_engine.wait_for_wake_word()
                 
                 if wake_detected:
-                    # Get command after wake word
+                    # Get REAL user command
                     user_text = await self.voice_engine.listen_command()
                     
                     if not user_text:
@@ -123,17 +132,15 @@ class EnhancedProductionButler:
                         
                     user_text_lower = user_text.lower()
                     
-                    # Handle mode switching
-                    if 'demo mode' in user_text_lower or 'show me features' in user_text_lower:
-                        await self.start_demo_mode()
-                        continue
-                    elif user_text_lower in ['goodbye', 'bye', 'exit', 'quit']:
-                        await self.safe_speak("Goodbye! Thank you for using Butler.")
+                    # Handle exit commands
+                    if user_text_lower in ['goodbye', 'bye', 'exit', 'quit', 'stop']:
+                        await self.safe_speak("Goodbye! Thank you for using Butler. Have a great day!")
                         break
                     elif 'feedback' in user_text_lower:
                         await self.handle_feedback_request(user_text)
                     else:
-                        await self.process_enhanced_command(user_text)
+                        # NEW: Process with REAL conversation engine
+                        await self.process_real_conversation(user_text)
                     
             except KeyboardInterrupt:
                 self.logger.info("[STOP] Stopping Enhanced Butler...")
@@ -142,6 +149,65 @@ class EnhancedProductionButler:
                 self.logger.error(f"[ERROR] Enhanced production error: {e}")
                 await asyncio.sleep(1)
     
+    async def process_real_conversation(self, user_text: str):
+        """NEW: Process real conversations instead of demo mode"""
+        try:
+            self.logger.info(f"[USER] You: {user_text}")
+            
+            # Use REAL conversation engine
+            response = await self.real_conversation_engine.process_real_query(user_text)
+            
+            # Speak natural response
+            await self.safe_speak(response)
+            
+            # Track conversation history
+            self.conversation_history.append(user_text)
+            self.conversation_history.append(response)
+            
+            # Keep conversation history manageable
+            if len(self.conversation_history) > 10:
+                self.conversation_history = self.conversation_history[-10:]
+                    
+        except Exception as e:
+            self.logger.error(f"[ERROR] Conversation processing error: {e}")
+            await self.safe_speak("I'm having trouble understanding. Could you please repeat that?")
+
+    async def handle_real_service_flow(self, service_type: str, user_input: str):
+        """Handle real service conversations"""
+        self.logger.info(f"[SERVICE] Handling {service_type} request")
+        
+        # Ask for details
+        detail_prompt = await self.service_scenarios.get_service_details_prompt(service_type)
+        await self.safe_speak(detail_prompt)
+        
+        # Listen for user response
+        user_details = await self.voice_engine.listen_command()
+        
+        if user_details:
+            # Ask for timing
+            timing_question = await self.service_scenarios.get_timing_question()
+            await self.safe_speak(timing_question)
+            
+            # Listen for timing response
+            user_timing = await self.voice_engine.listen_command()
+            
+            if user_timing:
+                # Ask for location
+                location_question = await self.service_scenarios.get_location_question()
+                await self.safe_speak(location_question)
+                
+                # Listen for location response
+                user_location = await self.voice_engine.listen_command()
+                
+                if user_location:
+                    # Provide realistic next steps
+                    confirmation = f"Perfect! I have your {service_type} request for {user_timing} in {user_location}. I'm now searching for available professionals in your area. This may take a moment."
+                    await self.safe_speak(confirmation)
+                    
+                    # Simulate searching (replace with real API later)
+                    await asyncio.sleep(2)
+                    await self.safe_speak("I've found several qualified professionals available. When we integrate with service APIs, I'll be able to show you their ratings, prices, and book instantly!")
+
     async def process_enhanced_command(self, user_text: str):
         """Process command with real AI thinking"""
         try:
@@ -378,66 +444,6 @@ class EnhancedProductionButler:
                     await self.safe_speak("Please provide a rating between 1 and 5.")
             except:
                 await self.safe_speak("I didn't catch that rating. Please try again.")
-    
-    async def start_demo_mode(self):
-        """Start interactive demo mode"""
-        self.current_mode = "demo"
-        
-        print("\n" + "="*60)
-        print("[DEMO] BUTLER ENHANCED FEATURES DEMO")
-        print("="*60)
-        
-        await self.safe_speak("Welcome to Butler demo mode! I'll showcase all our advanced features.")
-        
-        # Demo multi-step booking
-        await self.safe_speak("First, let me demonstrate our smart multi-step booking process.")
-        await asyncio.sleep(1)
-        
-        demo_steps = [
-            "Instead of just booking, I'll guide you through each step:",
-            "I'll ask what service you need and your preferred time.",
-            "Then I'll get your contact information securely.",
-            "Finally, I'll confirm all details before booking."
-        ]
-        
-        for step in demo_steps:
-            await self.safe_speak(step)
-            await asyncio.sleep(2)
-        
-        # Demo vendor comparison
-        await self.safe_speak("Now, let me show you our vendor comparison feature.")
-        await asyncio.sleep(1)
-        
-        comparison_demo = [
-            "I can compare multiple vendors side by side.",
-            "You'll see ratings, response times, prices, and experience.",
-            "This helps you choose the best provider for your needs.",
-            "You can ask for detailed information about any vendor."
-        ]
-        
-        for demo in comparison_demo:
-            await self.safe_speak(demo)
-            await asyncio.sleep(2)
-        
-        # Demo smart recommendations
-        await self.safe_speak("Finally, let me demonstrate our smart recommendation engine.")
-        await asyncio.sleep(1)
-        
-        recommendation_demo = [
-            "I analyze vendor ratings, experience, and customer reviews.",
-            "I consider response times and service specialties.",
-            "The more you use Butler, the better my recommendations become.",
-            "I learn your preferences to suggest perfect matches."
-        ]
-        
-        for demo in recommendation_demo:
-            await self.safe_speak(demo)
-            await asyncio.sleep(2)
-        
-        await self.safe_speak("Demo completed! Would you like to try any of these features, or should I return to normal mode?")
-        
-        # Return to production mode
-        self.current_mode = "production"
     
     async def safe_speak(self, text: str):
         """Safely speak text with error handling"""
