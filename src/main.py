@@ -6,6 +6,8 @@ import os
 import sys
 import asyncio
 import importlib.util
+import time
+from typing import Dict
 
 
 print("🚀 Butler Voice Assistant - Enhanced Production Mode")
@@ -52,36 +54,37 @@ class EnhancedProductionButler:
         self.performance_optimizer = PerformanceOptimizer(config)
         self.is_running = False
         self.current_mode = "production"  # "production" or "demo"
+        self.logger = setup_logging()
         
     async def initialize(self):
-    """Initialize all enhanced production components"""
-    print("🔄 Initializing enhanced production Butler...")
-    
-    try:
-        # Setup logging
-        setup_logging()
+        """Initialize all enhanced production components"""
+        print("🔄 Initializing enhanced production Butler...")
         
-        # Initialize components
-        voice_ok = await self.voice_engine.initialize(self.config)
-        nlu_ok = await self.nlu_engine.initialize()
-        service_ok = await self.service_manager.initialize()
-        memory_ok = await self.memory_manager.initialize()
-        recommendation_ok = await self.recommendation_engine.initialize()
-        feedback_ok = await self.feedback_manager.initialize()
-        thinking_ok = await self.thinking_engine.initialize()
-        response_ok = await self.response_generator.initialize()
-        performance_ok = await self.performance_optimizer.initialize()
-        
-        
-        if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
-            print("✅ All enhanced production components initialized!")
-            return True
-        else:
-            print("⚠️ Some components had issues, but continuing...")
-            return True
+        try:
+            # Setup logging
+            setup_logging()
             
-            except Exception as e:
-                print(f"❌ Enhanced production initialization error: {e}")
+            # Initialize components
+            voice_ok = await self.voice_engine.initialize(self.config)
+            nlu_ok = await self.nlu_engine.initialize()
+            service_ok = await self.service_manager.initialize()
+            memory_ok = await self.memory_manager.initialize()
+            recommendation_ok = await self.recommendation_engine.initialize()
+            feedback_ok = await self.feedback_manager.initialize()
+            thinking_ok = await self.thinking_engine.initialize()
+            response_ok = await self.response_generator.initialize()
+            performance_ok = await self.performance_optimizer.initialize()
+            
+            
+            if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
+                print("✅ All enhanced production components initialized!")
+                return True
+            else:
+                print("⚠️ Some components had issues, but continuing...")
+                return True
+                
+        except Exception as e:
+            print(f"❌ Enhanced production initialization error: {e}")
             return False
     
     async def start_enhanced_production_mode(self):
@@ -139,67 +142,67 @@ class EnhancedProductionButler:
                 print(f"❌ Enhanced production error: {e}")
                 await asyncio.sleep(1)
     
-   async def process_enhanced_command(self, user_text: str):
-    """Process command with real AI thinking"""
-    try:
-        print(f"👤 You: {user_text}")
-        
-        # 🆕 START PERFORMANCE MONITORING
-        start_time = time.time()
-        
-        # Get current context
-        context = await self.memory_manager.get_context()
-        session_id = context['session']['session_id']
-        
-        # 🆕 AI THINKING PROCESS
-        thinking_result = await self.thinking_engine.process_thinking(user_text, context)
-        print(f"💭 Thinking: {thinking_result['thinking_process']}")
-        
-        # 🆕 GENERATE THINKING FEEDBACK
-        thinking_feedback = await self.response_generator.generate_thinking_feedback(thinking_result)
-        await self.safe_speak(thinking_feedback)
-        
-        # Continue with existing logic but with AI-enhanced responses
-        dialog_context = await self.dialog_manager.get_dialog_context(session_id)
-        
-        if dialog_context and not dialog_context.get('completed', True):
-            await self.continue_ai_dialog(session_id, user_text, thinking_result)
-        else:
-            await self.start_ai_conversation(session_id, user_text, context, thinking_result)
-        
-        # 🆕 RECORD PERFORMANCE METRICS
-        response_time = time.time() - start_time
-        await self.performance_optimizer.record_interaction(
-            response_time, user_text, "AI response generated"
-        )
-        
-        # 🆕 PERFORMANCE FEEDBACK
-        if await self.performance_optimizer.should_simplify_responses():
-            self.logger.info("⚡ Performance mode: simplifying responses")
-                
-    except Exception as e:
-        print(f"❌ AI command processing error: {e}")
-        await self.safe_speak("I'm having trouble processing that. Let me try again.")
+    async def process_enhanced_command(self, user_text: str):
+        """Process command with real AI thinking"""
+        try:
+            print(f"👤 You: {user_text}")
+            
+            # 🆕 START PERFORMANCE MONITORING
+            start_time = time.time()
+            
+            # Get current context
+            context = await self.memory_manager.get_context()
+            session_id = context['session']['session_id']
+            
+            # 🆕 AI THINKING PROCESS
+            thinking_result = await self.thinking_engine.process_thinking(user_text, context)
+            print(f"💭 Thinking: {thinking_result['thinking_process']}")
+            
+            # 🆕 GENERATE THINKING FEEDBACK
+            thinking_feedback = await self.response_generator.generate_thinking_feedback(thinking_result)
+            await self.safe_speak(thinking_feedback)
+            
+            # Continue with existing logic but with AI-enhanced responses
+            dialog_context = await self.dialog_manager.get_dialog_context(session_id)
+            
+            if dialog_context and not dialog_context.get('completed', True):
+                await self.continue_ai_dialog(session_id, user_text, thinking_result)
+            else:
+                await self.start_ai_conversation(session_id, user_text, context, thinking_result)
+            
+            # 🆕 RECORD PERFORMANCE METRICS
+            response_time = time.time() - start_time
+            await self.performance_optimizer.record_interaction(
+                response_time, user_text, "AI response generated"
+            )
+            
+            # 🆕 PERFORMANCE FEEDBACK
+            if await self.performance_optimizer.should_simplify_responses():
+                self.logger.info("⚡ Performance mode: simplifying responses")
+                    
+        except Exception as e:
+            print(f"❌ AI command processing error: {e}")
+            await self.safe_speak("I'm having trouble processing that. Let me try again.")
 
     async def continue_ai_dialog(self, session_id: str, user_input: str, thinking_result: Dict):
-    """Continue dialog with AI thinking"""
-    dialog_result = await self.dialog_manager.process_user_response(session_id, user_input)
-    
-    if dialog_result.get('completed'):
-        context = dialog_result['context']
+        """Continue dialog with AI thinking"""
+        dialog_result = await self.dialog_manager.process_user_response(session_id, user_input)
         
-        # 🆕 AI-ENHANCED RESPONSE
-        service_data = {'service_type': context.get('service_type', 'service')}
-        ai_response = await self.response_generator.generate_adaptive_response(
-            thinking_result, service_data, context
-        )
-        
-        await self.safe_speak(ai_response)
-    else:
-        await self.safe_speak(dialog_result['next_prompt'])
+        if dialog_result.get('completed'):
+            context = dialog_result['context']
+            
+            # 🆕 AI-ENHANCED RESPONSE
+            service_data = {'service_type': context.get('service_type', 'service')}
+            ai_response = await self.response_generator.generate_adaptive_response(
+                thinking_result, service_data, context
+            )
+            
+            await self.safe_speak(ai_response)
+        else:
+            await self.safe_speak(dialog_result['next_prompt'])
     
-    async def start_new_conversation(self, session_id: str, user_text: str, context: Dict):
-        """Start a new conversation with enhanced features"""
+    async def start_ai_conversation(self, session_id: str, user_text: str, context: Dict, thinking_result: Dict):
+        """Start a new AI-enhanced conversation"""
         # Understand the intent
         nlu_result = await self.nlu_engine.parse(user_text)
         intent = nlu_result['intent']
@@ -208,6 +211,12 @@ class EnhancedProductionButler:
         print(f"🧠 Intent: {intent}")
         print(f"📊 Entities: {entities}")
         print(f"💾 Context: {context['session']}")
+        
+        # 🆕 AI-ENHANCED RESPONSE GENERATION
+        service_data = {'service_type': entities.get('service_type', 'service')}
+        ai_response = await self.response_generator.generate_adaptive_response(
+            thinking_result, service_data, context
+        )
         
         # Execute based on intent with enhanced features
         if intent == "find_service":
@@ -230,11 +239,14 @@ class EnhancedProductionButler:
         else:
             response = "I can help you find services, compare vendors, get recommendations, or book appointments. What would you like to do?"
         
+        # Use AI response if available, otherwise use default response
+        final_response = ai_response if ai_response else response
+        
         # Speak response
-        await self.safe_speak(response)
+        await self.safe_speak(final_response)
         
         # Update conversation memory
-        await self.memory_manager.update_conversation(user_text, response, intent, entities)
+        await self.memory_manager.update_conversation(user_text, final_response, intent, entities)
         
         # Check if session should be restarted
         if await self.memory_manager.should_restart_session():
