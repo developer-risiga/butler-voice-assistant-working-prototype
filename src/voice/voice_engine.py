@@ -7,7 +7,8 @@ import logging
 import threading
 import time
 import os
-from elevenlabs import ElevenLabs, play
+import elevenlabs
+from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -168,7 +169,7 @@ class VoiceEngine:
             # Update character count
             self.monthly_char_count += len(text)
             
-            # Generate audio with ElevenLabs
+            # Generate audio with ElevenLabs - FIXED SYNTAX
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles[self.current_voice],
                 text=text,
@@ -179,12 +180,8 @@ class VoiceEngine:
                 }
             )
             
-            # Play audio in a separate thread to avoid blocking
-            def play_audio():
-                play(audio)
-            
-            # Run in thread pool to avoid blocking async loop
-            await asyncio.get_event_loop().run_in_executor(None, play_audio)
+            # Play the audio directly
+            elevenlabs.play(audio)
             
             self.logger.info(f"🎵 ElevenLabs speech: {len(text)} chars (Total: {self.monthly_char_count}/{self.char_limit})")
             
@@ -245,20 +242,5 @@ class VoiceEngine:
             "using_elevenlabs": self.use_elevenlabs,
             "current_voice": self.current_voice
         }
-    
-    def list_available_voices(self):
-        """List all available ElevenLabs voices"""
-        if self.elevenlabs_client:
-            try:
-                voices = self.elevenlabs_client.voices.get_all()
-                print("\n🎵 Available ElevenLabs Voices:")
-                for voice in voices.voices:
-                    print(f"  - {voice.name}: {voice.voice_id}")
-                return voices.voices
-            except Exception as e:
-                print(f"❌ Failed to fetch voices: {e}")
-        else:
-            print("❌ ElevenLabs client not initialized")
-        return []
 
 print("Enhanced VoiceEngine with ElevenLabs integration defined")
