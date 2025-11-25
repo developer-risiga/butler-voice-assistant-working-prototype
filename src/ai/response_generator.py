@@ -10,7 +10,7 @@ class AdaptiveResponseGenerator:
         self.response_templates = self._load_response_templates()
         
     async def initialize(self):
-        self.logger.info("🎯 Adaptive response generator initialized")
+        self.logger.info("[TARGET] Adaptive response generator initialized")
         return True
     
     def _load_response_templates(self) -> Dict[str, Any]:
@@ -163,3 +163,4 @@ class AdaptiveResponseGenerator:
             return "Let me analyze your requirements and find the best options."
 
 print("🎯 AdaptiveResponseGenerator class defined")
+
