@@ -13,6 +13,11 @@ import sys
 # Load environment variables from .env file
 load_dotenv()
 
+# DEBUG: Check if .env is loading
+print(f"[DEBUG] Current directory: {os.getcwd()}")
+print(f"[DEBUG] ELEVENLABS_API_KEY loaded: {'Yes' if os.getenv('ELEVENLABS_API_KEY') else 'No'}")
+print(f"[DEBUG] API key length: {len(os.getenv('ELEVENLABS_API_KEY', ''))} characters")
+
 # ElevenLabs imports with proper error handling
 try:
     from elevenlabs.client import ElevenLabs
@@ -269,3 +274,4 @@ async def main_demo():
 
 if __name__ == "__main__":
     asyncio.run(main_demo())
+
