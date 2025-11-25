@@ -23,7 +23,7 @@ class PerformanceOptimizer:
         }
         
     async def initialize(self):
-        self.logger.info("⚡ Performance optimizer initialized")
+        self.logger.info("[PERF] Performance optimizer initialized")
         return True
     
     async def monitor_conversation_start(self, session_id: str):
@@ -117,5 +117,6 @@ class PerformanceOptimizer:
                 report['avg_memory_usage'] > 400)
 
 print("⚡ PerformanceOptimizer class defined")
+
 
 
