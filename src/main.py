@@ -58,15 +58,6 @@ class EnhancedProductionButler:
         self.is_running = False
         self.current_mode = "production"
         self.logger = logging.getLogger("butler.main")
-        
-        # NEW: Import and initialize real conversation engines
-        from real_conversation_engine import RealConversationEngine
-        from human_response_generator import HumanResponseGenerator
-        from real_service_scenarios import RealServiceScenarios
-        
-        self.real_conversation_engine = RealConversationEngine()
-        self.human_response_generator = HumanResponseGenerator()
-        self.service_scenarios = RealServiceScenarios()
         self.conversation_history = []
         
     async def initialize(self):
@@ -84,11 +75,6 @@ class EnhancedProductionButler:
             thinking_ok = await self.thinking_engine.initialize()
             response_ok = await self.response_generator.initialize()
             performance_ok = await self.performance_optimizer.initialize()
-            
-            # NEW: Initialize real conversation components
-            conversation_ok = await self.real_conversation_engine.initialize()
-            human_response_ok = await self.human_response_generator.initialize()
-            scenarios_ok = await self.service_scenarios.initialize()
             
             if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
                 self.logger.info("[OK] All enhanced production components initialized!")
@@ -155,7 +141,7 @@ class EnhancedProductionButler:
             self.logger.info(f"[USER] You: {user_text}")
             
             # Use REAL conversation engine
-            response = await self.real_conversation_engine.process_real_query(user_text)
+            response = await self.process_real_query(user_text)
             
             # Speak natural response
             await self.safe_speak(response)
@@ -172,12 +158,55 @@ class EnhancedProductionButler:
             self.logger.error(f"[ERROR] Conversation processing error: {e}")
             await self.safe_speak("I'm having trouble understanding. Could you please repeat that?")
 
+    async def process_real_query(self, user_text: str) -> str:
+        """Process real user queries with natural responses"""
+        user_text_lower = user_text.lower()
+        
+        # Service-related queries
+        if any(word in user_text_lower for word in ['plumber', 'electrician', 'carpenter', 'cleaner', 'service']):
+            return await self.handle_service_request(user_text)
+        
+        # Greetings
+        elif any(word in user_text_lower for word in ['hello', 'hi', 'hey']):
+            return "Hello there! How can I help you today? I can assist with finding service professionals like plumbers, electricians, or cleaners."
+        
+        # Help requests
+        elif 'help' in user_text_lower:
+            return "Of course! I specialize in connecting you with reliable service professionals. You can ask me to find plumbers, electricians, carpenters, cleaners, or other home services. What do you need help with?"
+        
+        # Thank you
+        elif any(word in user_text_lower for word in ['thank', 'thanks']):
+            return "You're very welcome! Is there anything else I can help you with today?"
+        
+        # Default response
+        else:
+            return "I understand you're looking for assistance. I'm here to help you find reliable service professionals. Could you tell me what kind of service you need?"
+    
+    async def handle_service_request(self, user_text: str) -> str:
+        """Handle specific service requests"""
+        user_text_lower = user_text.lower()
+        
+        if 'plumb' in user_text_lower:
+            return "I can help you find a reliable plumber! Could you tell me more about what you need? For example, is it a leaky faucet, clogged drain, or something else?"
+        
+        elif 'electric' in user_text_lower:
+            return "I can connect you with qualified electricians! What specific electrical work do you need? Installation, repairs, or something else?"
+        
+        elif 'clean' in user_text_lower:
+            return "I know several excellent cleaning services! Are you looking for regular house cleaning, deep cleaning, or office cleaning?"
+        
+        elif 'carpent' in user_text_lower:
+            return "I can help you find skilled carpenters! What type of woodwork do you need? Furniture repair, custom work, or installations?"
+        
+        else:
+            return "I understand you need a service professional. Could you tell me what specifically you need help with? The more details you provide, the better I can assist you."
+
     async def handle_real_service_flow(self, service_type: str, user_input: str):
         """Handle real service conversations"""
         self.logger.info(f"[SERVICE] Handling {service_type} request")
         
         # Ask for details
-        detail_prompt = await self.service_scenarios.get_service_details_prompt(service_type)
+        detail_prompt = await self.get_service_details_prompt(service_type)
         await self.safe_speak(detail_prompt)
         
         # Listen for user response
@@ -185,7 +214,7 @@ class EnhancedProductionButler:
         
         if user_details:
             # Ask for timing
-            timing_question = await self.service_scenarios.get_timing_question()
+            timing_question = await self.get_timing_question()
             await self.safe_speak(timing_question)
             
             # Listen for timing response
@@ -193,7 +222,7 @@ class EnhancedProductionButler:
             
             if user_timing:
                 # Ask for location
-                location_question = await self.service_scenarios.get_location_question()
+                location_question = await self.get_location_question()
                 await self.safe_speak(location_question)
                 
                 # Listen for location response
@@ -207,6 +236,57 @@ class EnhancedProductionButler:
                     # Simulate searching (replace with real API later)
                     await asyncio.sleep(2)
                     await self.safe_speak("I've found several qualified professionals available. When we integrate with service APIs, I'll be able to show you their ratings, prices, and book instantly!")
+
+    async def get_service_details_prompt(self, service_type: str) -> str:
+        """Get natural prompt for service details"""
+        import random
+        
+        prompts = {
+            'plumber': [
+                "Could you describe the plumbing issue you're experiencing? For example, is it a leak, clogged drain, or something else?",
+                "What kind of plumbing work do you need help with? The more details you provide, the better I can match you with the right professional.",
+                "I know several excellent plumbers with different specialties. Could you tell me what specifically needs to be fixed or installed?"
+            ],
+            'electrician': [
+                "What electrical work are you looking to have done? Installation, repairs, lighting, or something else?",
+                "Electrical work can vary quite a bit. Could you describe what you need so I can find the right electrician for the job?",
+                "I want to make sure I connect you with an electrician who specializes in your specific need. What exactly requires attention?"
+            ],
+            'cleaner': [
+                "What type of cleaning service are you looking for? Regular maintenance, deep cleaning, move-in/out cleaning, or something specific?",
+                "Cleaning needs can vary - are you looking for general house cleaning, office cleaning, or something more specialized?",
+                "Could you tell me about the space that needs cleaning and what kind of cleaning service you're expecting?"
+            ]
+        }
+        
+        default_prompt = "Could you tell me more about what you need? The details will help me find the perfect service professional for you."
+        
+        if service_type in prompts:
+            return random.choice(prompts[service_type])
+        else:
+            return f"Could you describe what you need from the {service_type}? This will help me find the right professional for your specific situation."
+    
+    async def get_timing_question(self) -> str:
+        """Get natural timing question"""
+        import random
+        
+        questions = [
+            "When would you like the service to be completed? Are you thinking today, this week, or is it more flexible?",
+            "What's your preferred timing for this service? Is it urgent, or do you have some flexibility?",
+            "When were you hoping to have this work done? This helps me check availability with the professionals."
+        ]
+        return random.choice(questions)
+    
+    async def get_location_question(self) -> str:
+        """Get natural location question"""
+        import random
+        
+        questions = [
+            "Could you tell me your location or area? This helps me find professionals who service your neighborhood.",
+            "What area are you located in? I'll search for service providers who cover your location.",
+            "Which part of the city are you in? This ensures I only recommend professionals who work in your area."
+        ]
+        return random.choice(questions)
 
     async def process_enhanced_command(self, user_text: str):
         """Process command with real AI thinking"""
