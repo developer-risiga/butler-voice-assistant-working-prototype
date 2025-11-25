@@ -1,4 +1,4 @@
-# voice_engine.py
+# voice_engine_fixed.py
 import asyncio
 import speech_recognition as sr
 from gtts import gTTS
@@ -6,17 +6,39 @@ import pygame
 import io
 import logging
 import os
+import tempfile
+import sys
 
 # ElevenLabs imports with proper error handling
 try:
     from elevenlabs.client import ElevenLabs
-    # IMPORTANT: import the callable `play` function from the submodule
     from elevenlabs.play import play
     ELEVENLABS_AVAILABLE = True
     print("✅ ElevenLabs imports successful")
 except Exception as e:
     print(f"❌ ElevenLabs imports failed: {e}")
     ELEVENLABS_AVAILABLE = False
+
+def configure_logging():
+    """Configure logging to avoid UnicodeEncodeError on Windows consoles."""
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+
+    # Wrap stdout buffer with utf-8 TextIOWrapper and replace invalid characters
+    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    handler = logging.StreamHandler(stream=utf8_stdout)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+
+    # remove other handlers and add ours
+    if root.handlers:
+        for h in list(root.handlers):
+            root.removeHandler(h)
+    root.addHandler(handler)
+
+# call logger config early
+configure_logging()
 
 class VoiceEngine:
     """Production-ready voice processing engine with ElevenLabs integration"""
@@ -60,6 +82,7 @@ class VoiceEngine:
             
             # Initialize pygame for audio playback (used by Google TTS fallback)
             if not self.pygame_initialized:
+                # init mixer only once
                 pygame.mixer.init()
                 self.pygame_initialized = True
             
@@ -67,21 +90,21 @@ class VoiceEngine:
             if self.use_elevenlabs:
                 success = await self._initialize_elevenlabs()
                 if success:
-                    print("🎯 Voice Status: ElevenLabs ENABLED")
+                    self.logger.info("🎯 Voice Status: ElevenLabs ENABLED")
                 else:
-                    print("🎯 Voice Status: ElevenLabs DISABLED - Using Google TTS")
+                    self.logger.info("🎯 Voice Status: ElevenLabs DISABLED - Using Google TTS")
             else:
                 if not ELEVENLABS_AVAILABLE:
-                    print("🎯 Voice Status: ElevenLabs SDK not installed - Using Google TTS")
+                    self.logger.info("🎯 Voice Status: ElevenLabs SDK not installed - Using Google TTS")
                 else:
-                    print("🎯 Voice Status: ElevenLabs API key missing - Using Google TTS")
+                    self.logger.info("🎯 Voice Status: ElevenLabs API key missing - Using Google TTS")
             
             self.is_initialized = True
-            print("✅ Production voice engine initialized!")
+            self.logger.info("✅ Production voice engine initialized!")
             return True
             
         except Exception as e:
-            print(f"❌ Voice engine init failed: {e}")
+            self.logger.exception(f"❌ Voice engine init failed: {e}")
             return False
     
     async def _initialize_elevenlabs(self):
@@ -90,17 +113,15 @@ class VoiceEngine:
             if not ELEVENLABS_AVAILABLE or not self.elevenlabs_api_key:
                 return False
                 
-            # Synchronous client (there is also AsyncElevenLabs if you prefer async)
             self.elevenlabs_client = ElevenLabs(api_key=self.elevenlabs_api_key)
             
             # Try a simple voices call to validate the key & connection
             try:
                 voices_resp = self.elevenlabs_client.voices.search()
                 n_voices = len(getattr(voices_resp, "voices", []))
-                print(f"✅ ElevenLabs initialized with {n_voices} voices available!")
+                self.logger.info(f"✅ ElevenLabs initialized with {n_voices} voices available!")
             except Exception as inner_e:
-                # If voice listing fails, still consider client invalid
-                print(f"❌ ElevenLabs voice listing failed: {inner_e}")
+                self.logger.warning(f"❌ ElevenLabs voice listing failed: {inner_e}")
                 self.use_elevenlabs = False
                 self.elevenlabs_client = None
                 return False
@@ -108,26 +129,26 @@ class VoiceEngine:
             return True
             
         except Exception as e:
-            print(f"❌ ElevenLabs initialization failed: {e}")
+            self.logger.exception(f"❌ ElevenLabs initialization failed: {e}")
             self.use_elevenlabs = False
             self.elevenlabs_client = None
             return False
     
     async def wait_for_wake_word(self):
         """Wait for wake word before listening to commands"""
-        print(f"🔍 Waiting for wake word: '{self.wake_word}'...")
+        self.logger.info(f"🔍 Waiting for wake word: '{self.wake_word}'...")
         
         while True:
             try:
                 with self.microphone as source:
-                    print("💤 Sleeping... say 'Butler' to wake me up")
+                    self.logger.info("💤 Sleeping... say 'Butler' to wake me up")
                     audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
                 
                 # Convert to text
                 text = self.recognizer.recognize_google(audio).lower()
                 
                 if self.wake_word in text:
-                    print("🎯 Wake word detected!")
+                    self.logger.info("🎯 Wake word detected!")
                     await self.speak("Yes? How can I help you?")
                     return True
                     
@@ -136,14 +157,13 @@ class VoiceEngine:
             except sr.UnknownValueError:
                 continue
             except Exception as e:
-                # log and continue (don't crash on single recognition error)
                 self.logger.debug(f"Wake-word listen error: {e}")
                 continue
     
     async def listen_command(self) -> str:
         """Listen for a voice command after wake word"""
         try:
-            print("🎤 Listening for command... (Speak now)")
+            self.logger.info("🎤 Listening for command... (Speak now)")
             
             with self.microphone as source:
                 audio = self.recognizer.listen(source, timeout=10, phrase_time_limit=8)
@@ -152,18 +172,18 @@ class VoiceEngine:
             text = self.recognizer.recognize_google(audio)
             
             if text:
-                print(f"🎯 Command: {text}")
+                self.logger.info(f"🎯 Command: {text}")
                 return text
             return ""
             
         except sr.WaitTimeoutError:
-            print("⏰ No command detected")
+            self.logger.info("⏰ No command detected")
             return ""
         except sr.UnknownValueError:
-            print("❌ Could not understand command")
+            self.logger.warning("❌ Could not understand command")
             return ""
         except Exception as e:
-            print(f"❌ Command listening error: {e}")
+            self.logger.exception(f"❌ Command listening error: {e}")
             return ""
     
     async def speak(self, text: str):
@@ -177,7 +197,7 @@ class VoiceEngine:
             return
             
         try:
-            print(f"🔊 Butler: {text}")
+            self.logger.info(f"🔊 Butler: {text}")
             
             # Use ElevenLabs if available and configured
             if self.use_elevenlabs and self.elevenlabs_client:
@@ -185,21 +205,20 @@ class VoiceEngine:
                 if self.monthly_char_count + len(text) <= self.char_limit:
                     await self._speak_elevenlabs(text)
                 else:
-                    print("⚠️ ElevenLabs character limit reached, using Google TTS")
+                    self.logger.warning("⚠️ ElevenLabs character limit reached, using Google TTS")
                     await self._speak_google_tts(text)
             else:
                 # Fallback to Google TTS
                 await self._speak_google_tts(text)
                 
         except Exception as e:
-            print(f"❌ Text-to-speech error: {e}")
+            self.logger.exception(f"❌ Text-to-speech error: {e}")
             # Ultimate fallback - just print text
             print(f"Butler (text only): {text}")
     
     async def _speak_elevenlabs(self, text: str):
         """Use ElevenLabs for high-quality voice generation"""
         try:
-            # Generate audio with ElevenLabs (synchronous call)
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles.get(self.current_voice),
                 text=text,
@@ -210,53 +229,60 @@ class VoiceEngine:
                 }
             )
             
-            # Play the audio using the official helper `play` (imported correctly above)
-            # `play` expects the audio object returned by the SDK
+            # Play the audio using the official helper `play`
             play(audio)
             
             # Update character count
             self.monthly_char_count += len(text)
-            print(f"🎵 ElevenLabs voice used: {len(text)} characters")
+            self.logger.info(f"🎵 ElevenLabs voice used: {len(text)} characters")
             
         except Exception as e:
-            print(f"❌ ElevenLabs TTS failed: {e}")
+            self.logger.exception(f"❌ ElevenLabs TTS failed: {e}")
             # Fallback to Google TTS
             await self._speak_google_tts(text)
     
     async def _speak_google_tts(self, text: str):
-        """Fallback to Google TTS"""
+        """Fallback to Google TTS with reliable Windows playback (temp file)"""
         try:
-            # Use Google TTS
+            # Create gTTS object
             tts = gTTS(text=text, lang='en', slow=False)
             
-            # Save to buffer
-            audio_buffer = io.BytesIO()
-            tts.write_to_fp(audio_buffer)
-            audio_buffer.seek(0)
+            # Write to a temporary file (MP3). On Windows pygame may not accept BytesIO MP3s.
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                temp_path = tmp.name
+                # gTTS can write to the file-like object
+                tts.write_to_fp(tmp)
+                tmp.flush()
             
-            # Ensure pygame is initialized
+            # Ensure pygame mixer initialized
             if not self.pygame_initialized:
                 pygame.mixer.init()
                 self.pygame_initialized = True
             
-            # Play audio from buffer using pygame
-            pygame.mixer.music.load(audio_buffer)
+            # Load and play file
+            pygame.mixer.music.load(temp_path)
             pygame.mixer.music.play()
             
-            # Wait for playback
+            # Wait until playback finishes
             while pygame.mixer.music.get_busy():
                 await asyncio.sleep(0.1)
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except Exception:
+                self.logger.debug(f"Could not remove temp file: {temp_path}")
                 
         except Exception as e:
-            print(f"❌ Google TTS error: {e}")
+            self.logger.exception(f"❌ Google TTS error: {e}")
     
     def set_voice_style(self, style: str = "butler_default"):
         """Change the ElevenLabs voice style"""
         if style in self.voice_profiles:
             self.current_voice = style
-            print(f"🎭 Voice style changed to: {style}")
+            self.logger.info(f"🎭 Voice style changed to: {style}")
         else:
-            print(f"⚠️ Voice style '{style}' not found, using default")
+            self.logger.warning(f"⚠️ Voice style '{style}' not found, using default")
     
     def get_voice_status(self):
         """Get current voice engine status"""
@@ -268,5 +294,11 @@ class VoiceEngine:
             "elevenlabs_configured": bool(self.elevenlabs_client)
         }
 
+# Example quick run (for testing)
+async def main_demo():
+    e = VoiceEngine()
+    await e.initialize()
+    await e.speak("This is a quick test. Hello from Butler voice assistant.")
+
 if __name__ == "__main__":
-    print("✅ Enhanced VoiceEngine with ElevenLabs - Ready!")
+    asyncio.run(main_demo())
