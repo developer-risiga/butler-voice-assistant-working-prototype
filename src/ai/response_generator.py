@@ -162,5 +162,6 @@ class AdaptiveResponseGenerator:
         else:
             return "Let me analyze your requirements and find the best options."
 
-print("🎯 AdaptiveResponseGenerator class defined")
+print("[TARGET] AdaptiveResponseGenerator class defined")
+
 
