@@ -124,8 +124,8 @@ class EnhancedProductionButler:
                         self.last_interaction_time = time.time()
                         await self.safe_speak("I'm here! How can I help you?")
                 else:
-                    # Listen for command with shorter timeout when awake
-                    user_text = await self.voice_engine.listen_command(timeout=15)
+                    # Listen for command without timeout parameter
+                    user_text = await self.voice_engine.listen_command()
                     
                     if user_text:
                         self.last_interaction_time = time.time()  # Reset timer
