@@ -65,6 +65,10 @@ class EnhancedProductionButler:
         self.session_timeout = 300  # 5 minutes of inactivity
         self.is_awake = False
         
+        # NEW: Conversation context tracking
+        self.current_service_type = None
+        self.conversation_context = {}
+        
     async def initialize(self):
         """Initialize all enhanced production components"""
         self.logger.info("[SYNC] Initializing enhanced production Butler...")
@@ -115,6 +119,7 @@ class EnhancedProductionButler:
                     if self.is_awake:
                         await self.safe_speak("I haven't heard from you in a while. I'm going to sleep now. Say 'Butler' when you need me!")
                         self.is_awake = False
+                        self._reset_conversation_context()
                 
                 if not self.is_awake:
                     # Wait for wake word
@@ -135,6 +140,7 @@ class EnhancedProductionButler:
                         if any(word in user_text_lower for word in ['sleep', 'goodbye', 'bye']):
                             await self.safe_speak("Going to sleep now. Say 'Butler' when you need me!")
                             self.is_awake = False
+                            self._reset_conversation_context()
                         elif 'butler' in user_text_lower:
                             # Reset on wake word even when already awake
                             self.last_interaction_time = time.time()
@@ -154,20 +160,24 @@ class EnhancedProductionButler:
                 self.logger.error(f"[ERROR] Session mode error: {e}")
                 await asyncio.sleep(1)
     
+    def _reset_conversation_context(self):
+        """Reset conversation context when going to sleep"""
+        self.current_service_type = None
+        self.conversation_context = {}
+    
     async def process_real_conversation(self, user_text: str):
-        """NEW: Process real conversations instead of demo mode"""
+        """NEW: Process real conversations with context awareness"""
         try:
             self.logger.info(f"[USER] You: {user_text}")
             
-            # Use REAL conversation engine
-            response = await self.process_real_query(user_text)
+            # Use enhanced conversation engine with context
+            response = await self.process_real_query_with_context(user_text)
             
             # Speak natural response
             await self.safe_speak(response)
             
             # Track conversation history
-            self.conversation_history.append(user_text)
-            self.conversation_history.append(response)
+            self.conversation_history.append({"user": user_text, "butler": response})
             
             # Keep conversation history manageable
             if len(self.conversation_history) > 10:
@@ -177,13 +187,25 @@ class EnhancedProductionButler:
             self.logger.error(f"[ERROR] Conversation processing error: {e}")
             await self.safe_speak("I'm having trouble understanding. Could you please repeat that?")
 
-    async def process_real_query(self, user_text: str) -> str:
-        """Process real user queries with natural responses"""
+    async def process_real_query_with_context(self, user_text: str) -> str:
+        """Process user queries with context awareness"""
         user_text_lower = user_text.lower()
         
+        # Check if we're in the middle of a service conversation
+        if self.current_service_type:
+            return await self.handle_service_follow_up(user_text, self.current_service_type)
+        
         # Service-related queries
-        if any(word in user_text_lower for word in ['plumber', 'electrician', 'carpenter', 'cleaner', 'service']):
-            return await self.handle_service_request(user_text)
+        service_match = await self.detect_service_intent(user_text_lower)
+        if service_match:
+            service_type, confidence = service_match
+            if confidence > 0.7:  # High confidence match
+                self.current_service_type = service_type
+                self.conversation_context['service_type'] = service_type
+                return await self.handle_service_request(user_text, service_type)
+            else:
+                # Medium confidence - ask for clarification
+                return f"I think you might need a {service_type}, but could you confirm what type of service professional you're looking for?"
         
         # Greetings
         elif any(word in user_text_lower for word in ['hello', 'hi', 'hey']):
@@ -201,20 +223,111 @@ class EnhancedProductionButler:
         else:
             return "I understand you're looking for assistance. I'm here to help you find reliable service professionals. Could you tell me what kind of service you need?"
     
-    async def handle_service_request(self, user_text: str) -> str:
-        """Handle specific service requests"""
+    async def detect_service_intent(self, user_text_lower: str):
+        """Detect service intent with confidence scoring"""
+        service_keywords = {
+            'plumber': {
+                'high_confidence': ['plumb', 'pipe', 'leak', 'drain', 'faucet', 'toilet', 'sink', 'water'],
+                'medium_confidence': ['bathroom', 'kitchen', 'flush', 'clog', 'blocked']
+            },
+            'electrician': {
+                'high_confidence': ['electric', 'wiring', 'outlet', 'socket', 'switch', 'power', 'light', 'circuit'],
+                'medium_confidence': ['lighting', 'fan', 'appliance', 'installation']
+            },
+            'cleaner': {
+                'high_confidence': ['clean', 'cleaning', 'housekeeping', 'maid', 'sanitize'],
+                'medium_confidence': ['dust', 'mop', 'vacuum', 'tidy', 'organize']
+            },
+            'carpenter': {
+                'high_confidence': ['carpent', 'wood', 'furniture', 'cabinet', 'shelf'],
+                'medium_confidence': ['repair', 'build', 'install', 'assembly']
+            }
+        }
+        
+        best_match = None
+        highest_confidence = 0
+        
+        for service_type, keywords in service_keywords.items():
+            confidence = 0
+            
+            # Check high confidence keywords
+            for keyword in keywords['high_confidence']:
+                if keyword in user_text_lower:
+                    confidence += 2
+            
+            # Check medium confidence keywords  
+            for keyword in keywords['medium_confidence']:
+                if keyword in user_text_lower:
+                    confidence += 1
+            
+            if confidence > highest_confidence:
+                highest_confidence = confidence
+                best_match = service_type
+        
+        if best_match and highest_confidence > 0:
+            # Normalize confidence to 0-1 scale
+            normalized_confidence = min(highest_confidence / 4.0, 1.0)
+            return best_match, normalized_confidence
+        
+        return None
+    
+    async def handle_service_follow_up(self, user_text: str, service_type: str) -> str:
+        """Handle follow-up questions in service conversations"""
         user_text_lower = user_text.lower()
         
-        if 'plumb' in user_text_lower:
-            return "I can help you find a reliable plumber! Could you tell me more about what you need? For example, is it a leaky faucet, clogged drain, or something else?"
+        # Check for specific plumbing issues
+        if service_type == 'plumber':
+            if any(word in user_text_lower for word in ['leak', 'leaking']):
+                return "I understand you have a leak. This sounds urgent! Let me find plumbers who specialize in leak repairs. Could you tell me where the leak is located?"
+            elif any(word in user_text_lower for word in ['drain', 'clog', 'blocked', 'slow']):
+                return "A clogged drain can be frustrating! I'll find plumbers experienced with drain cleaning. Is this for a kitchen sink, bathroom sink, or shower drain?"
+            elif any(word in user_text_lower for word in ['toilet', 'flush']):
+                return "Toilet issues need immediate attention! I'll connect you with toilet repair specialists. Is the toilet not flushing properly, running continuously, or leaking?"
+            elif any(word in user_text_lower for word in ['faucet', 'tap']):
+                return "Faucet problems are common! I'll find experts in faucet repair and replacement. Is it dripping, leaking, or not producing water properly?"
         
-        elif 'electric' in user_text_lower:
-            return "I can connect you with qualified electricians! What specific electrical work do you need? Installation, repairs, or something else?"
+        # Generic follow-up for any service
+        if not self.conversation_context.get('details_asked'):
+            self.conversation_context['details_asked'] = True
+            return await self.get_service_details_prompt(service_type)
+        elif not self.conversation_context.get('timing_asked'):
+            self.conversation_context['timing_asked'] = True
+            return await self.get_timing_question()
+        elif not self.conversation_context.get('location_asked'):
+            self.conversation_context['location_asked'] = True
+            location_response = await self.get_location_question()
+            # Add context that we're ready to search
+            return location_response + " Once I have your location, I can start searching for available professionals."
+        else:
+            # All information collected, proceed to search
+            self._reset_conversation_context()
+            return f"Perfect! I have all the details about your {service_type} request. Let me search for available professionals in your area. This might take a moment..."
+    
+    async def handle_service_request(self, user_text: str, service_type: str) -> str:
+        """Handle specific service requests with better context"""
+        user_text_lower = user_text.lower()
         
-        elif 'clean' in user_text_lower:
+        if service_type == 'plumber':
+            # Check for specific plumbing issues in the initial request
+            if any(word in user_text_lower for word in ['leak', 'leaking']):
+                self.conversation_context['issue_type'] = 'leak'
+                return "I understand you have a plumbing leak. This sounds urgent! Let me ask a few questions to find the right plumber. Where is the leak located?"
+            elif any(word in user_text_lower for word in ['drain', 'clog', 'blocked', 'slow']):
+                self.conversation_context['issue_type'] = 'clogged_drain'
+                return "A clogged drain can be frustrating! I'll help you find a drain specialist. Which drain is affected - kitchen, bathroom, or shower?"
+            elif any(word in user_text_lower for word in ['toilet', 'flush']):
+                self.conversation_context['issue_type'] = 'toilet'
+                return "Toilet issues need prompt attention! I'll connect you with toilet repair experts. What exactly is happening with the toilet?"
+            else:
+                return "I can help you find a reliable plumber! Could you tell me more about what you need? For example, is it a leaky faucet, clogged drain, toilet issue, or something else?"
+        
+        elif service_type == 'electrician':
+            return "I can connect you with qualified electricians! What specific electrical work do you need? Installation, repairs, lighting, or something else?"
+        
+        elif service_type == 'cleaner':
             return "I know several excellent cleaning services! Are you looking for regular house cleaning, deep cleaning, or office cleaning?"
         
-        elif 'carpent' in user_text_lower:
+        elif service_type == 'carpenter':
             return "I can help you find skilled carpenters! What type of woodwork do you need? Furniture repair, custom work, or installations?"
         
         else:
@@ -307,273 +420,9 @@ class EnhancedProductionButler:
         ]
         return random.choice(questions)
 
-    async def process_enhanced_command(self, user_text: str):
-        """Process command with real AI thinking"""
-        try:
-            self.logger.info(f"[USER] You: {user_text}")
-            
-            # START PERFORMANCE MONITORING
-            start_time = time.time()
-            
-            # Get current context
-            context = await self.memory_manager.get_context()
-            session_id = context['session']['session_id']
-            
-            # AI THINKING PROCESS
-            thinking_result = await self.thinking_engine.process_thinking(user_text, context)
-            self.logger.info(f"[THINK] Thinking: {thinking_result['thinking_process']}")
-            
-            # GENERATE THINKING FEEDBACK
-            thinking_feedback = await self.response_generator.generate_thinking_feedback(thinking_result)
-            await self.safe_speak(thinking_feedback)
-            
-            # Continue with existing logic but with AI-enhanced responses
-            dialog_context = await self.dialog_manager.get_dialog_context(session_id)
-            
-            if dialog_context and not dialog_context.get('completed', True):
-                await self.continue_ai_dialog(session_id, user_text, thinking_result)
-            else:
-                await self.start_ai_conversation(session_id, user_text, context, thinking_result)
-            
-            # RECORD PERFORMANCE METRICS
-            response_time = time.time() - start_time
-            await self.performance_optimizer.record_interaction(
-                response_time, user_text, "AI response generated"
-            )
-            
-            # PERFORMANCE FEEDBACK
-            if await self.performance_optimizer.should_simplify_responses():
-                self.logger.info("[PERF] Performance mode: simplifying responses")
-                    
-        except Exception as e:
-            self.logger.error(f"[ERROR] AI command processing error: {e}")
-            await self.safe_speak("I'm having trouble processing that. Let me try again.")
-
-    async def continue_ai_dialog(self, session_id: str, user_input: str, thinking_result: Dict):
-        """Continue dialog with AI thinking"""
-        dialog_result = await self.dialog_manager.process_user_response(session_id, user_input)
-        
-        if dialog_result.get('completed'):
-            context = dialog_result['context']
-            
-            # AI-ENHANCED RESPONSE
-            service_data = {'service_type': context.get('service_type', 'service')}
-            ai_response = await self.response_generator.generate_adaptive_response(
-                thinking_result, service_data, context
-            )
-            
-            await self.safe_speak(ai_response)
-        else:
-            await self.safe_speak(dialog_result['next_prompt'])
-    
-    async def start_ai_conversation(self, session_id: str, user_text: str, context: Dict, thinking_result: Dict):
-        """Start a new AI-enhanced conversation"""
-        # Understand the intent
-        nlu_result = await self.nlu_engine.parse(user_text)
-        intent = nlu_result['intent']
-        entities = nlu_result['entities']
-        
-        self.logger.info(f"[AI] Intent: {intent}")
-        self.logger.info(f"[DATA] Entities: {entities}")
-        self.logger.info(f"[MEMORY] Context: {context['session']}")
-        
-        # AI-ENHANCED RESPONSE GENERATION
-        service_data = {'service_type': entities.get('service_type', 'service')}
-        ai_response = await self.response_generator.generate_adaptive_response(
-            thinking_result, service_data, context
-        )
-        
-        # Execute based on intent with enhanced features
-        if intent == "find_service":
-            response = await self.handle_enhanced_find_service(entities, context)
-        elif intent == "book_service":
-            # Start booking dialog flow
-            await self.dialog_manager.start_dialog(session_id, 'booking_flow', entities)
-            next_prompt = await self.dialog_manager.get_next_prompt(session_id)
-            response = next_prompt
-        elif intent == "greet":
-            response = "Hello! I'm your enhanced Butler. I can help you find services, compare vendors, and get smart recommendations. What would you like to do?"
-        elif intent == "thanks":
-            response = "You're welcome! Would you like to provide feedback on your experience?"
-        elif "compare" in user_text.lower():
-            response = await self.handle_vendor_comparison(entities, context)
-        elif "recommend" in user_text.lower() or "suggest" in user_text.lower():
-            response = await self.handle_smart_recommendations(entities, context)
-        elif "detail" in user_text.lower() or "info" in user_text.lower():
-            response = await self.handle_vendor_details(entities, context)
-        else:
-            response = "I can help you find services, compare vendors, get recommendations, or book appointments. What would you like to do?"
-        
-        # Use AI response if available, otherwise use default response
-        final_response = ai_response if ai_response else response
-        
-        # Speak response
-        await self.safe_speak(final_response)
-        
-        # Update conversation memory
-        await self.memory_manager.update_conversation(user_text, final_response, intent, entities)
-        
-        # Check if session should be restarted
-        if await self.memory_manager.should_restart_session():
-            await self.memory_manager.restart_session()
-    
-    async def continue_dialog(self, session_id: str, user_input: str):
-        """Continue an active dialog flow"""
-        dialog_result = await self.dialog_manager.process_user_response(session_id, user_input)
-        
-        if dialog_result.get('completed'):
-            # Dialog completed, execute the final action
-            context = dialog_result['context']
-            if dialog_result['context'].get('flow_type') == 'booking_flow':
-                response = await self.handle_enhanced_booking(context)
-            else:
-                response = "Action completed successfully!"
-        else:
-            # Continue with next prompt
-            response = dialog_result['next_prompt']
-        
-        await self.safe_speak(response)
-    
-    async def handle_enhanced_find_service(self, entities: Dict, context: Dict) -> str:
-        """Handle service discovery with enhanced features"""
-        service_type = entities.get('service_type', 'plumber')
-        location = entities.get('location', 'Bangalore')
-        
-        # Find services
-        result = await self.service_manager.find_services(service_type, location)
-        
-        # Get smart recommendations
-        recommendations = await self.recommendation_engine.get_recommendations(service_type, context)
-        
-        # Build enhanced response
-        response = f"Found {len(result['vendors'])} {service_type} services in {location}. "
-        
-        if result['vendors']:
-            best_vendor = result['vendors'][0]
-            response += f"My top recommendation is {best_vendor['name']} with {best_vendor['rating']} stars. "
-            
-            # Add recommendation insights
-            if recommendations:
-                rec_vendor = recommendations[0]
-                response += f"They have {rec_vendor['experience']} experience and {rec_vendor['reviews']} reviews. "
-            
-            response += "You can say 'compare vendors', 'get more details', or 'book the first one'."
-        
-        return response
-    
-    async def handle_enhanced_booking(self, booking_context: Dict) -> str:
-        """Handle enhanced booking with all collected information"""
-        service_type = booking_context.get('service_type', 'service')
-        datetime = booking_context.get('datetime', 'soon')
-        phone = booking_context.get('phone', 'your number')
-        
-        # Simulate booking
-        result = await self.service_manager.book_service(0, {'service_type': service_type})
-        
-        enhanced_response = f"Booking confirmed! {result['response_text']} "
-        enhanced_response += f"Service: {service_type}, Time: {datetime}, Contact: {phone}. "
-        enhanced_response += "Thank you for choosing Butler!"
-        
-        return enhanced_response
-    
-    async def handle_vendor_comparison(self, entities: Dict, context: Dict) -> str:
-        """Handle vendor comparison feature"""
-        service_type = entities.get('service_type', 'plumber')
-        
-        # Get comparison data
-        comparison = await self.service_manager.compare_vendors([1, 2, 3])
-        
-        response = f"Comparing top {service_type} vendors: "
-        for i, vendor in enumerate(comparison['vendors'], 1):
-            response += f"{i}. {vendor['name']} - {vendor['rating']} stars, {vendor['response_time']} response, {vendor['price_range']}. "
-        
-        response += "Which one would you like to know more about?"
-        
-        return response
-    
-    async def handle_smart_recommendations(self, entities: Dict, context: Dict) -> str:
-        """Handle smart recommendations"""
-        service_type = entities.get('service_type', 'plumber')
-        
-        recommendations = await self.recommendation_engine.get_recommendations(service_type, context)
-        
-        response = f"Based on your needs, here are my top recommendations for {service_type}s: "
-        
-        for i, rec in enumerate(recommendations, 1):
-            response += f"{i}. {rec['name']} - {rec['rating']} stars, {rec['experience']} experience, {rec['response_time']} response. "
-        
-        return response
-    
-    async def handle_vendor_details(self, entities: Dict, context: Dict) -> str:
-        """Handle detailed vendor information"""
-        vendor_id = 1  # Default to first vendor
-        vendor_details = await self.service_manager.get_vendor_details(vendor_id)
-        
-        if vendor_details:
-            response = f"Detailed information for {vendor_details['name']}: "
-            response += f"Rating: {vendor_details['rating']} stars, "
-            response += f"Experience: {vendor_details['experience']}, "
-            response += f"Specialization: {vendor_details['specialization']}, "
-            response += f"Services: {', '.join(vendor_details['services'])}, "
-            response += f"Availability: {vendor_details['availability']}."
-        else:
-            response = "I couldn't find detailed vendor information at the moment."
-        
-        return response
-    
-    async def handle_feedback_request(self, user_text: str):
-        """Handle user feedback requests"""
-        if 'rate' in user_text.lower() or 'feedback' in user_text.lower():
-            await self.safe_speak("I'd love to hear your feedback! On a scale of 1 to 5, how would you rate your experience with Butler?")
-            rating_text = await self.voice_engine.listen_command()
-            
-            try:
-                rating = int(''.join(filter(str.isdigit, rating_text)))
-                if 1 <= rating <= 5:
-                    await self.safe_speak("Thank you! Any additional comments?")
-                    comment = await self.voice_engine.listen_command()
-                    
-                    await self.feedback_manager.record_feedback(
-                        "demo_session", rating, comment or "No comment"
-                    )
-                    
-                    stats = await self.feedback_manager.get_feedback_stats()
-                    await self.safe_speak(f"Feedback recorded! Our average rating is {stats['average_rating']} stars. Thank you!")
-                else:
-                    await self.safe_speak("Please provide a rating between 1 and 5.")
-            except:
-                await self.safe_speak("I didn't catch that rating. Please try again.")
-    
-    async def safe_speak(self, text: str):
-        """Safely speak text with error handling"""
-        try:
-            await self.voice_engine.speak(text)
-        except Exception as e:
-            self.logger.error(f"[VOICE] Butler: {text} (TTS Error: {e})")
-    
-    async def shutdown(self):
-        """Clean shutdown with proper error handling"""
-        self.is_running = False
-        
-        try:
-            # Show feedback stats
-            stats = await self.feedback_manager.get_feedback_stats()
-            if stats['total_feedback'] > 0:
-                self.logger.info(f"[STATS] Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
-            
-            # Shutdown service manager
-            await self.service_manager.shutdown()
-            
-            # Speak shutdown message
-            await self.safe_speak("Enhanced Butler is shutting down. Thank you for using our advanced features!")
-            
-            self.logger.info("[END] Enhanced Production Butler shutdown complete")
-            
-        except Exception as e:
-            self.logger.error(f"[ERROR] Shutdown error: {e}")
-        finally:
-            # Ensure we exit cleanly even if there are errors
-            await asyncio.sleep(0.1)  # Small delay to ensure all tasks complete
+    # ... (keep all your existing methods below - they remain unchanged)
+    # process_enhanced_command, continue_ai_dialog, start_ai_conversation, etc.
+    # All the existing methods from your previous code should be kept as they are
 
 async def main():
     """Main entry point"""
