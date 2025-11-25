@@ -116,7 +116,8 @@ class PerformanceOptimizer:
         return (report['avg_response_time'] > 2.0 or 
                 report['avg_memory_usage'] > 400)
 
-print("⚡ PerformanceOptimizer class defined")
+print("[PERF] PerformanceOptimizer class defined")
+
 
 
 
