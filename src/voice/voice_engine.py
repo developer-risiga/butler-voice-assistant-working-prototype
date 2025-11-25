@@ -13,15 +13,10 @@ import sys
 # Load environment variables from .env file
 load_dotenv()
 
-# DEBUG: Check if .env is loading
-print(f"[DEBUG] Current directory: {os.getcwd()}")
-print(f"[DEBUG] ELEVENLABS_API_KEY loaded: {'Yes' if os.getenv('ELEVENLABS_API_KEY') else 'No'}")
-print(f"[DEBUG] API key length: {len(os.getenv('ELEVENLABS_API_KEY', ''))} characters")
-
 # ElevenLabs imports with proper error handling
 try:
     from elevenlabs.client import ElevenLabs
-    from elevenlabs.play import play
+    from elevenlabs import play
     ELEVENLABS_AVAILABLE = True
     print("[OK] ElevenLabs imports successful")
 except Exception as e:
@@ -211,17 +206,49 @@ class VoiceEngine:
 
     async def _speak_elevenlabs(self, text: str):
         try:
+            self.logger.info(f"Generating ElevenLabs audio for: {text}")
+            
+            # Generate audio from ElevenLabs
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles.get(self.current_voice),
                 text=text,
                 model_id="eleven_turbo_v2",
                 voice_settings={"stability": 0.3, "similarity_boost": 0.8}
             )
-            play(audio)
+            
+            # Save audio to temporary file
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+                # Write all audio chunks to file
+                for chunk in audio:
+                    tmp.write(chunk)
+                temp_path = tmp.name
+            
+            self.logger.info(f"Audio saved to temporary file: {temp_path}")
+            
+            # Play with pygame (same method as Google TTS)
+            if not self.pygame_initialized:
+                pygame.mixer.init()
+                self.pygame_initialized = True
+
+            pygame.mixer.music.load(temp_path)
+            pygame.mixer.music.play()
+            
+            # Wait for playback to complete
+            while pygame.mixer.music.get_busy():
+                await asyncio.sleep(0.1)
+            
+            # Clean up temporary file
+            try:
+                os.remove(temp_path)
+            except Exception:
+                self.logger.debug(f"Could not remove temp file: {temp_path}")
+            
             self.monthly_char_count += len(text)
             self.logger.info(f"ElevenLabs used: {len(text)} chars")
+            
         except Exception as e:
             self.logger.exception(f"ElevenLabs TTS failed: {e}")
+            self.logger.info("Falling back to Google TTS")
             await self._speak_google_tts(text)
 
     async def _speak_google_tts(self, text: str):
@@ -268,11 +295,9 @@ async def main_demo():
     engine = VoiceEngine()
     ok = await engine.initialize()
     if ok:
-        await engine.speak("Hello. This test should play audio.")
+        await engine.speak("Hello. This test should play audio with ElevenLabs.")
     else:
         engine.logger.error("[ERROR] Engine failed to initialize.")
 
 if __name__ == "__main__":
     asyncio.run(main_demo())
-
-
