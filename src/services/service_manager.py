@@ -25,7 +25,7 @@ class ServiceManager:
         self.use_real_api = False  # Change this when you have real API keys
         
         self.is_initialized = True
-        self.logger.info("✅ Production service manager initialized!")
+        self.logger.info("[OK] Production service manager initialized!")
         return True
     
     async def find_services(self, service_type: str, location: str = None) -> Dict[str, Any]:
