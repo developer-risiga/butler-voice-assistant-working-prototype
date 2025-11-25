@@ -7,8 +7,7 @@ import logging
 import threading
 import time
 import os
-from elevenlabs import play
-from elevenlabs.client import ElevenLabs
+import elevenlabs
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -27,8 +26,8 @@ class VoiceEngine:
         self.is_listening = False
         self.wake_word = "butler"
         
-        # ElevenLabs Configuration
-        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
+        # ElevenLabs Configuration - TEMPORARY HARDCODE
+        self.elevenlabs_api_key = "sk_19ea793678ccd614a1a9a880ef5c3d1496908c0cb742ec83"  # ← PUT YOUR REAL KEY HERE
         self.use_elevenlabs = True if self.elevenlabs_api_key else False
         self.elevenlabs_client = None
         self.voice_profiles = {
@@ -57,9 +56,10 @@ class VoiceEngine:
                 self.pygame_initialized = True
             
             # Initialize ElevenLabs client
-            if self.use_elevenlabs and self.elevenlabs_api_key:
+            if self.use_elevenlabs and self.elevenlabs_api_key and self.elevenlabs_api_key != "YOUR_ACTUAL_API_KEY_HERE":
                 try:
-                    self.elevenlabs_client = ElevenLabs(api_key=self.elevenlabs_api_key)
+                    # CORRECT way to initialize ElevenLabs client for v2.24.0
+                    self.elevenlabs_client = elevenlabs.ElevenLabs(api_key=self.elevenlabs_api_key)
                     self.logger.info("✅ ElevenLabs client initialized!")
                     
                     # Test the connection by listing voices
@@ -70,8 +70,10 @@ class VoiceEngine:
                     self.logger.warning(f"❌ ElevenLabs init failed, using fallback TTS: {e}")
                     self.use_elevenlabs = False
             else:
-                self.logger.warning("ElevenLabs API key not found, using Google TTS")
+                if self.elevenlabs_api_key == "YOUR_ACTUAL_API_KEY_HERE":
+                    self.logger.warning("❌ Please update YOUR_ACTUAL_API_KEY_HERE with your real ElevenLabs API key")
                 self.use_elevenlabs = False
+                self.logger.warning("ElevenLabs disabled, using Google TTS")
             
             self.is_initialized = True
             self.logger.info("✅ Production voice engine initialized!")
@@ -169,7 +171,7 @@ class VoiceEngine:
             # Update character count
             self.monthly_char_count += len(text)
             
-            # Generate audio with ElevenLabs - CORRECT SYNTAX FOR v2.24.0
+            # Generate audio with ElevenLabs - CORRECT SYNTAX
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles[self.current_voice],
                 text=text,
@@ -180,8 +182,8 @@ class VoiceEngine:
                 }
             )
             
-            # Play the audio - CORRECT SYNTAX
-            play(audio)
+            # CORRECT way to play audio in v2.24.0
+            elevenlabs.play(audio)
             
             self.logger.info(f"🎵 ElevenLabs speech: {len(text)} chars (Total: {self.monthly_char_count}/{self.char_limit})")
             
@@ -225,22 +227,5 @@ class VoiceEngine:
             self.logger.info(f"🎭 Voice style changed to: {style}")
         else:
             self.logger.warning(f"Voice style '{style}' not found, using default")
-    
-    def update_voice_settings(self, stability: float = 0.3, similarity_boost: float = 0.8):
-        """Update ElevenLabs voice settings for emotional control"""
-        self.voice_settings = {
-            "stability": stability,  # Lower = more emotional/expressive
-            "similarity_boost": similarity_boost  # Higher = closer to original voice
-        }
-    
-    def get_usage_stats(self) -> dict:
-        """Get ElevenLabs usage statistics"""
-        return {
-            "characters_used": self.monthly_char_count,
-            "character_limit": self.char_limit,
-            "remaining_chars": max(0, self.char_limit - self.monthly_char_count),
-            "using_elevenlabs": self.use_elevenlabs,
-            "current_voice": self.current_voice
-        }
 
 print("Enhanced VoiceEngine with ElevenLabs v2.24.0 integration defined")
