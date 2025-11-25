@@ -214,7 +214,7 @@ class VoiceEngine:
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles.get(self.current_voice),
                 text=text,
-                model_id="eleven_monolingual_v1",
+                model_id="eleven_turbo_v2",
                 voice_settings={"stability": 0.3, "similarity_boost": 0.8}
             )
             play(audio)
@@ -274,4 +274,5 @@ async def main_demo():
 
 if __name__ == "__main__":
     asyncio.run(main_demo())
+
 
