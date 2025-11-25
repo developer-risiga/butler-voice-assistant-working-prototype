@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+from utils.safe_logging import configure_logging
+configure_logging()
+
 """
 Butler Voice Assistant - Enhanced Production Version
 """
