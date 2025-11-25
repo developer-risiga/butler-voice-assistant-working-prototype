@@ -333,42 +333,6 @@ class EnhancedProductionButler:
         else:
             return "I understand you need a service professional. Could you tell me what specifically you need help with? The more details you provide, the better I can assist you."
 
-    async def handle_real_service_flow(self, service_type: str, user_input: str):
-        """Handle real service conversations"""
-        self.logger.info(f"[SERVICE] Handling {service_type} request")
-        
-        # Ask for details
-        detail_prompt = await self.get_service_details_prompt(service_type)
-        await self.safe_speak(detail_prompt)
-        
-        # Listen for user response
-        user_details = await self.voice_engine.listen_command()
-        
-        if user_details:
-            # Ask for timing
-            timing_question = await self.get_timing_question()
-            await self.safe_speak(timing_question)
-            
-            # Listen for timing response
-            user_timing = await self.voice_engine.listen_command()
-            
-            if user_timing:
-                # Ask for location
-                location_question = await self.get_location_question()
-                await self.safe_speak(location_question)
-                
-                # Listen for location response
-                user_location = await self.voice_engine.listen_command()
-                
-                if user_location:
-                    # Provide realistic next steps
-                    confirmation = f"Perfect! I have your {service_type} request for {user_timing} in {user_location}. I'm now searching for available professionals in your area. This may take a moment."
-                    await self.safe_speak(confirmation)
-                    
-                    # Simulate searching (replace with real API later)
-                    await asyncio.sleep(2)
-                    await self.safe_speak("I've found several qualified professionals available. When we integrate with service APIs, I'll be able to show you their ratings, prices, and book instantly!")
-
     async def get_service_details_prompt(self, service_type: str) -> str:
         """Get natural prompt for service details"""
         import random
@@ -420,9 +384,59 @@ class EnhancedProductionButler:
         ]
         return random.choice(questions)
 
-    # ... (keep all your existing methods below - they remain unchanged)
-    # process_enhanced_command, continue_ai_dialog, start_ai_conversation, etc.
-    # All the existing methods from your previous code should be kept as they are
+    async def safe_speak(self, text: str):
+        """Safely speak text with error handling"""
+        try:
+            await self.voice_engine.speak(text)
+        except Exception as e:
+            self.logger.error(f"[VOICE] Butler: {text} (TTS Error: {e})")
+
+    async def handle_feedback_request(self, user_text: str):
+        """Handle user feedback requests"""
+        if 'rate' in user_text.lower() or 'feedback' in user_text.lower():
+            await self.safe_speak("I'd love to hear your feedback! On a scale of 1 to 5, how would you rate your experience with Butler?")
+            rating_text = await self.voice_engine.listen_command()
+            
+            try:
+                rating = int(''.join(filter(str.isdigit, rating_text)))
+                if 1 <= rating <= 5:
+                    await self.safe_speak("Thank you! Any additional comments?")
+                    comment = await self.voice_engine.listen_command()
+                    
+                    await self.feedback_manager.record_feedback(
+                        "demo_session", rating, comment or "No comment"
+                    )
+                    
+                    stats = await self.feedback_manager.get_feedback_stats()
+                    await self.safe_speak(f"Feedback recorded! Our average rating is {stats['average_rating']} stars. Thank you!")
+                else:
+                    await self.safe_speak("Please provide a rating between 1 and 5.")
+            except:
+                await self.safe_speak("I didn't catch that rating. Please try again.")
+
+    async def shutdown(self):
+        """Clean shutdown with proper error handling"""
+        self.is_running = False
+        
+        try:
+            # Show feedback stats
+            stats = await self.feedback_manager.get_feedback_stats()
+            if stats['total_feedback'] > 0:
+                self.logger.info(f"[STATS] Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
+            
+            # Shutdown service manager
+            await self.service_manager.shutdown()
+            
+            # Speak shutdown message
+            await self.safe_speak("Enhanced Butler is shutting down. Thank you for using our advanced features!")
+            
+            self.logger.info("[END] Enhanced Production Butler shutdown complete")
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Shutdown error: {e}")
+        finally:
+            # Ensure we exit cleanly even if there are errors
+            await asyncio.sleep(0.1)  # Small delay to ensure all tasks complete
 
 async def main():
     """Main entry point"""
