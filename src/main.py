@@ -195,17 +195,12 @@ class EnhancedProductionButler:
         if self.current_service_type:
             return await self.handle_service_follow_up(user_text, self.current_service_type)
         
-        # Service-related queries
-        service_match = await self.detect_service_intent(user_text_lower)
-        if service_match:
-            service_type, confidence = service_match
-            if confidence > 0.7:  # High confidence match
-                self.current_service_type = service_type
-                self.conversation_context['service_type'] = service_type
-                return await self.handle_service_request(user_text, service_type)
-            else:
-                # Medium confidence - ask for clarification
-                return f"I think you might need a {service_type}, but could you confirm what type of service professional you're looking for?"
+        # Service-related queries - SIMPLIFIED LOGIC
+        service_type = await self.detect_service_intent_simple(user_text_lower)
+        if service_type:
+            self.current_service_type = service_type
+            self.conversation_context['service_type'] = service_type
+            return await self.handle_service_request(user_text, service_type)
         
         # Greetings
         elif any(word in user_text_lower for word in ['hello', 'hi', 'hey']):
@@ -223,54 +218,22 @@ class EnhancedProductionButler:
         else:
             return "I understand you're looking for assistance. I'm here to help you find reliable service professionals. Could you tell me what kind of service you need?"
     
-    async def detect_service_intent(self, user_text_lower: str):
-        """Detect service intent with confidence scoring"""
+    async def detect_service_intent_simple(self, user_text_lower: str) -> str:
+        """Simplified service intent detection - just look for keywords"""
         service_keywords = {
-            'plumber': {
-                'high_confidence': ['plumb', 'pipe', 'leak', 'drain', 'faucet', 'toilet', 'sink', 'water'],
-                'medium_confidence': ['bathroom', 'kitchen', 'flush', 'clog', 'blocked']
-            },
-            'electrician': {
-                'high_confidence': ['electric', 'wiring', 'outlet', 'socket', 'switch', 'power', 'light', 'circuit'],
-                'medium_confidence': ['lighting', 'fan', 'appliance', 'installation']
-            },
-            'cleaner': {
-                'high_confidence': ['clean', 'cleaning', 'housekeeping', 'maid', 'sanitize'],
-                'medium_confidence': ['dust', 'mop', 'vacuum', 'tidy', 'organize']
-            },
-            'carpenter': {
-                'high_confidence': ['carpent', 'wood', 'furniture', 'cabinet', 'shelf'],
-                'medium_confidence': ['repair', 'build', 'install', 'assembly']
-            }
+            'plumber': ['plumb', 'pipe', 'leak', 'drain', 'faucet', 'toilet', 'sink', 'water', 'clog', 'blocked'],
+            'electrician': ['electric', 'wiring', 'outlet', 'socket', 'switch', 'power', 'light', 'circuit', 'fan', 'appliance'],
+            'cleaner': ['clean', 'cleaning', 'housekeeping', 'maid', 'sanitize', 'dust', 'mop', 'vacuum'],
+            'carpenter': ['carpent', 'wood', 'furniture', 'cabinet', 'shelf', 'repair', 'build', 'install']
         }
         
-        best_match = None
-        highest_confidence = 0
-        
         for service_type, keywords in service_keywords.items():
-            confidence = 0
-            
-            # Check high confidence keywords
-            for keyword in keywords['high_confidence']:
+            for keyword in keywords:
                 if keyword in user_text_lower:
-                    confidence += 2
-            
-            # Check medium confidence keywords  
-            for keyword in keywords['medium_confidence']:
-                if keyword in user_text_lower:
-                    confidence += 1
-            
-            if confidence > highest_confidence:
-                highest_confidence = confidence
-                best_match = service_type
-        
-        if best_match and highest_confidence > 0:
-            # Normalize confidence to 0-1 scale
-            normalized_confidence = min(highest_confidence / 4.0, 1.0)
-            return best_match, normalized_confidence
+                    return service_type
         
         return None
-    
+
     async def handle_service_follow_up(self, user_text: str, service_type: str) -> str:
         """Handle follow-up questions in service conversations"""
         user_text_lower = user_text.lower()
