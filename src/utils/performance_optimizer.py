@@ -2,7 +2,7 @@ import asyncio
 import time
 import psutil
 import logging
-from typing import Dict, Any
+from typing import Dict, Any List
 
 class PerformanceOptimizer:
     """Real-time performance monitoring and optimization"""
@@ -117,3 +117,4 @@ class PerformanceOptimizer:
                 report['avg_memory_usage'] > 400)
 
 print("⚡ PerformanceOptimizer class defined")
+
