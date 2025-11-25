@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 import os
-import elevenlabs
+from elevenlabs import play
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
@@ -62,7 +62,7 @@ class VoiceEngine:
                     self.elevenlabs_client = ElevenLabs(api_key=self.elevenlabs_api_key)
                     self.logger.info("✅ ElevenLabs client initialized!")
                     
-                    # Test the connection
+                    # Test the connection by listing voices
                     voices = self.elevenlabs_client.voices.get_all()
                     self.logger.info(f"🎵 Available ElevenLabs voices: {len(voices.voices)}")
                     
@@ -169,7 +169,7 @@ class VoiceEngine:
             # Update character count
             self.monthly_char_count += len(text)
             
-            # Generate audio with ElevenLabs - FIXED SYNTAX
+            # Generate audio with ElevenLabs - CORRECT SYNTAX FOR v2.24.0
             audio = self.elevenlabs_client.text_to_speech.convert(
                 voice_id=self.voice_profiles[self.current_voice],
                 text=text,
@@ -180,8 +180,8 @@ class VoiceEngine:
                 }
             )
             
-            # Play the audio directly
-            elevenlabs.play(audio)
+            # Play the audio - CORRECT SYNTAX
+            play(audio)
             
             self.logger.info(f"🎵 ElevenLabs speech: {len(text)} chars (Total: {self.monthly_char_count}/{self.char_limit})")
             
@@ -243,4 +243,4 @@ class VoiceEngine:
             "current_voice": self.current_voice
         }
 
-print("Enhanced VoiceEngine with ElevenLabs integration defined")
+print("Enhanced VoiceEngine with ElevenLabs v2.24.0 integration defined")
