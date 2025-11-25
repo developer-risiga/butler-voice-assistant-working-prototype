@@ -60,6 +60,11 @@ class EnhancedProductionButler:
         self.logger = logging.getLogger("butler.main")
         self.conversation_history = []
         
+        # NEW: Session management variables
+        self.last_interaction_time = None
+        self.session_timeout = 300  # 5 minutes of inactivity
+        self.is_awake = False
+        
     async def initialize(self):
         """Initialize all enhanced production components"""
         self.logger.info("[SYNC] Initializing enhanced production Butler...")
@@ -88,51 +93,65 @@ class EnhancedProductionButler:
             return False
     
     async def start_enhanced_production_mode(self):
-        """Start REAL conversation mode (replaces demo mode)"""
+        """Enhanced with session management"""
         self.is_running = True
         self.current_mode = "production"
+        self.last_interaction_time = time.time()
         
         print("\n" + "="*60)
-        print("🎙️  BUTLER - REAL CONVERSATION MODE")
+        print("🎙️  BUTLER - ACTIVE SESSION MODE")
         print("="*60)
-        print("💬 Now speaking like a human assistant")
-        print("🛠️  Ready to handle real service requests")
-        print("📍 Say 'Butler' then your service need")
-        print("⏹️  Say 'goodbye' or press Ctrl+C to exit")
+        print("💬 I'll stay awake for 5 minutes after each interaction")
+        print("🔄 Say 'Butler' anytime to reset the timer")
+        print("💤 I'll automatically sleep after 5 minutes of inactivity")
         print("="*60)
         
-        # NEW: Real greeting instead of demo announcement
-        await self.safe_speak("Hello! I'm Butler, your personal service assistant. I'm ready to help you find reliable service professionals. Just say 'Butler' followed by what you need!")
+        await self.safe_speak("Hello! I'm Butler. I'll stay active and ready to help. Just speak naturally!")
         
         while self.is_running:
             try:
-                # Wait for wake word
-                wake_detected = await self.voice_engine.wait_for_wake_word()
+                # Check for session timeout
+                if (time.time() - self.last_interaction_time) > self.session_timeout:
+                    if self.is_awake:
+                        await self.safe_speak("I haven't heard from you in a while. I'm going to sleep now. Say 'Butler' when you need me!")
+                        self.is_awake = False
                 
-                if wake_detected:
-                    # Get REAL user command
-                    user_text = await self.voice_engine.listen_command()
+                if not self.is_awake:
+                    # Wait for wake word
+                    wake_detected = await self.voice_engine.wait_for_wake_word()
+                    if wake_detected:
+                        self.is_awake = True
+                        self.last_interaction_time = time.time()
+                        await self.safe_speak("I'm here! How can I help you?")
+                else:
+                    # Listen for command with shorter timeout when awake
+                    user_text = await self.voice_engine.listen_command(timeout=15)
                     
-                    if not user_text:
-                        continue
+                    if user_text:
+                        self.last_interaction_time = time.time()  # Reset timer
+                        user_text_lower = user_text.lower()
                         
-                    user_text_lower = user_text.lower()
-                    
-                    # Handle exit commands
-                    if user_text_lower in ['goodbye', 'bye', 'exit', 'quit', 'stop']:
-                        await self.safe_speak("Goodbye! Thank you for using Butler. Have a great day!")
-                        break
-                    elif 'feedback' in user_text_lower:
-                        await self.handle_feedback_request(user_text)
+                        # Handle sleep commands
+                        if any(word in user_text_lower for word in ['sleep', 'goodbye', 'bye']):
+                            await self.safe_speak("Going to sleep now. Say 'Butler' when you need me!")
+                            self.is_awake = False
+                        elif 'butler' in user_text_lower:
+                            # Reset on wake word even when already awake
+                            self.last_interaction_time = time.time()
+                            await self.safe_speak("Yes, I'm listening!")
+                        elif 'feedback' in user_text_lower:
+                            await self.handle_feedback_request(user_text)
+                        else:
+                            await self.process_real_conversation(user_text)
                     else:
-                        # NEW: Process with REAL conversation engine
-                        await self.process_real_conversation(user_text)
-                    
+                        # No speech detected, but don't sleep immediately
+                        self.logger.info("[ACTIVE] No speech detected, but staying awake...")
+                        
             except KeyboardInterrupt:
                 self.logger.info("[STOP] Stopping Enhanced Butler...")
                 break
             except Exception as e:
-                self.logger.error(f"[ERROR] Enhanced production error: {e}")
+                self.logger.error(f"[ERROR] Session mode error: {e}")
                 await asyncio.sleep(1)
     
     async def process_real_conversation(self, user_text: str):
