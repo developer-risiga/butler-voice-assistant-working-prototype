@@ -11,6 +11,8 @@ import asyncio
 import importlib.util
 import time
 from typing import Dict
+import logging
+import io
 
 
 print("🚀 Butler Voice Assistant - Enhanced Production Mode")
@@ -42,6 +44,57 @@ from ai.thinking_engine import ThinkingEngine
 from ai.response_generator import AdaptiveResponseGenerator
 from utils.performance_optimizer import PerformanceOptimizer
 
+class UnicodeSafeStreamHandler(logging.StreamHandler):
+    """Custom stream handler that safely handles Unicode characters on Windows"""
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            # Encode to UTF-8 and replace any problematic characters
+            if sys.platform == "win32":
+                msg = msg.encode('utf-8', 'replace').decode('utf-8')
+            stream.write(msg + self.terminator)
+            self.flush()
+        except Exception:
+            self.handleError(record)
+
+def setup_unicode_safe_logging():
+    """Setup logging that works with Unicode characters on all platforms"""
+    root_logger = logging.getLogger()
+    
+    # Remove existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Create Unicode-safe handler
+    handler = UnicodeSafeStreamHandler(sys.stdout)
+    
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    handler.setFormatter(formatter)
+    
+    # Add handler to root logger
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+    
+    return root_logger
+
+def fix_unicode_encoding():
+    """Fix Unicode encoding issues on Windows"""
+    if sys.platform == "win32":
+        try:
+            # Set stdout and stderr to use UTF-8 encoding
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+            
+            # Try to set console code page to UTF-8 on Windows
+            os.system('chcp 65001 > nul 2>&1')
+        except Exception as e:
+            print(f"⚠️ Unicode encoding fix partially applied: {e}")
+
 class EnhancedProductionButler:
     def __init__(self):
         self.config = config
@@ -57,15 +110,18 @@ class EnhancedProductionButler:
         self.performance_optimizer = PerformanceOptimizer(config)
         self.is_running = False
         self.current_mode = "production"  # "production" or "demo"
-        self.logger = setup_logging()
+        self.logger = setup_unicode_safe_logging()
         
     async def initialize(self):
         """Initialize all enhanced production components"""
         print("🔄 Initializing enhanced production Butler...")
         
         try:
-            # Setup logging
-            setup_logging()
+            # Apply Unicode fixes
+            fix_unicode_encoding()
+            
+            # Setup safe logging
+            setup_unicode_safe_logging()
             
             # Initialize components
             voice_ok = await self.voice_engine.initialize(self.config)
@@ -78,16 +134,16 @@ class EnhancedProductionButler:
             response_ok = await self.response_generator.initialize()
             performance_ok = await self.performance_optimizer.initialize()
             
-            
+            # Use text-based logging for initialization status
             if all([voice_ok, nlu_ok, service_ok, memory_ok, recommendation_ok, feedback_ok, thinking_ok, response_ok, performance_ok]):
-                print("✅ All enhanced production components initialized!")
+                print(">>> All enhanced production components initialized!")
                 return True
             else:
-                print("⚠️ Some components had issues, but continuing...")
+                print("*** Some components had issues, but continuing...")
                 return True
                 
         except Exception as e:
-            print(f"❌ Enhanced production initialization error: {e}")
+            print(f"!!! Enhanced production initialization error: {e}")
             return False
     
     async def start_enhanced_production_mode(self):
@@ -96,18 +152,18 @@ class EnhancedProductionButler:
         self.current_mode = "production"
         
         print("\n" + "="*60)
-        print("🏭 BUTLER VOICE ASSISTANT - ENHANCED PRODUCTION MODE")
+        print(">>> BUTLER VOICE ASSISTANT - ENHANCED PRODUCTION MODE")
         print("="*60)
-        print("💡 Enhanced Features:")
+        print("*** Enhanced Features:")
         print("   - Multi-step conversations")
         print("   - Smart vendor recommendations") 
         print("   - Vendor comparisons & detailed info")
         print("   - Conversation memory & context")
         print("   - User feedback collection")
         print("="*60)
-        print("🎤 Say 'Butler' to activate, then your command")
-        print("📋 Say 'demo mode' for feature showcase")
-        print("⏹️  Say 'goodbye' or press Ctrl+C to exit")
+        print(">>> Say 'Butler' to activate, then your command")
+        print(">>> Say 'demo mode' for feature showcase")
+        print(">>> Say 'goodbye' or press Ctrl+C to exit")
         print("="*60)
         
         await self.safe_speak("Enhanced Butler is ready! Say Butler to begin, or demo mode for a feature showcase.")
@@ -139,10 +195,10 @@ class EnhancedProductionButler:
                         await self.process_enhanced_command(user_text)
                     
             except KeyboardInterrupt:
-                print("\n🛑 Stopping Enhanced Butler...")
+                print("\n*** Stopping Enhanced Butler...")
                 break
             except Exception as e:
-                print(f"❌ Enhanced production error: {e}")
+                print(f"!!! Enhanced production error: {e}")
                 await asyncio.sleep(1)
     
     async def process_enhanced_command(self, user_text: str):
@@ -150,18 +206,18 @@ class EnhancedProductionButler:
         try:
             print(f"👤 You: {user_text}")
             
-            # 🆕 START PERFORMANCE MONITORING
+            # START PERFORMANCE MONITORING
             start_time = time.time()
             
             # Get current context
             context = await self.memory_manager.get_context()
             session_id = context['session']['session_id']
             
-            # 🆕 AI THINKING PROCESS
+            # AI THINKING PROCESS
             thinking_result = await self.thinking_engine.process_thinking(user_text, context)
-            print(f"💭 Thinking: {thinking_result['thinking_process']}")
+            print(f">>> Thinking: {thinking_result['thinking_process']}")
             
-            # 🆕 GENERATE THINKING FEEDBACK
+            # GENERATE THINKING FEEDBACK
             thinking_feedback = await self.response_generator.generate_thinking_feedback(thinking_result)
             await self.safe_speak(thinking_feedback)
             
@@ -173,18 +229,18 @@ class EnhancedProductionButler:
             else:
                 await self.start_ai_conversation(session_id, user_text, context, thinking_result)
             
-            # 🆕 RECORD PERFORMANCE METRICS
+            # RECORD PERFORMANCE METRICS
             response_time = time.time() - start_time
             await self.performance_optimizer.record_interaction(
                 response_time, user_text, "AI response generated"
             )
             
-            # 🆕 PERFORMANCE FEEDBACK
+            # PERFORMANCE FEEDBACK
             if await self.performance_optimizer.should_simplify_responses():
-                self.logger.info("⚡ Performance mode: simplifying responses")
+                self.logger.info("*** Performance mode: simplifying responses")
                     
         except Exception as e:
-            print(f"❌ AI command processing error: {e}")
+            print(f"!!! AI command processing error: {e}")
             await self.safe_speak("I'm having trouble processing that. Let me try again.")
 
     async def continue_ai_dialog(self, session_id: str, user_input: str, thinking_result: Dict):
@@ -194,7 +250,7 @@ class EnhancedProductionButler:
         if dialog_result.get('completed'):
             context = dialog_result['context']
             
-            # 🆕 AI-ENHANCED RESPONSE
+            # AI-ENHANCED RESPONSE
             service_data = {'service_type': context.get('service_type', 'service')}
             ai_response = await self.response_generator.generate_adaptive_response(
                 thinking_result, service_data, context
@@ -211,11 +267,11 @@ class EnhancedProductionButler:
         intent = nlu_result['intent']
         entities = nlu_result['entities']
         
-        print(f"🧠 Intent: {intent}")
-        print(f"📊 Entities: {entities}")
-        print(f"💾 Context: {context['session']}")
+        print(f">>> Intent: {intent}")
+        print(f">>> Entities: {entities}")
+        print(f">>> Context: {context['session']}")
         
-        # 🆕 AI-ENHANCED RESPONSE GENERATION
+        # AI-ENHANCED RESPONSE GENERATION
         service_data = {'service_type': entities.get('service_type', 'service')}
         ai_response = await self.response_generator.generate_adaptive_response(
             thinking_result, service_data, context
@@ -387,7 +443,7 @@ class EnhancedProductionButler:
         self.current_mode = "demo"
         
         print("\n" + "="*60)
-        print("🎪 BUTLER ENHANCED FEATURES DEMO")
+        print(">>> BUTLER ENHANCED FEATURES DEMO")
         print("="*60)
         
         await self.safe_speak("Welcome to Butler demo mode! I'll showcase all our advanced features.")
@@ -447,7 +503,7 @@ class EnhancedProductionButler:
         try:
             await self.voice_engine.speak(text)
         except Exception as e:
-            print(f"🔊 Butler: {text} (TTS Error: {e})")
+            print(f">>> Butler: {text} (TTS Error: {e})")
     
     async def shutdown(self):
         """Clean shutdown"""
@@ -456,11 +512,11 @@ class EnhancedProductionButler:
         # Show feedback stats
         stats = await self.feedback_manager.get_feedback_stats()
         if stats['total_feedback'] > 0:
-            print(f"📊 Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
+            print(f">>> Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
         
         await self.service_manager.shutdown()
         await self.safe_speak("Enhanced Butler is shutting down. Thank you for using our advanced features!")
-        print("\n🔚 Enhanced Production Butler shutdown complete")
+        print("\n*** Enhanced Production Butler shutdown complete")
 
 async def main():
     """Main entry point"""
@@ -470,14 +526,14 @@ async def main():
         # Initialize
         success = await butler.initialize()
         if not success:
-            print("❌ Enhanced Butler initialization failed!")
+            print("!!! Enhanced Butler initialization failed!")
             return
         
         # Start enhanced production mode
         await butler.start_enhanced_production_mode()
         
     except Exception as e:
-        print(f"💥 Enhanced Butler crashed: {e}")
+        print(f">>> Enhanced Butler crashed: {e}")
     finally:
         await butler.shutdown()
 
