@@ -78,7 +78,7 @@ class VoiceEngine:
 
     async def initialize(self, config=None):
         self.config = config
-        self.logger.info("🔄 Initializing production voice engine...")
+        self.logger.info("[SYNC] Initializing production voice engine...")
 
         try:
             # Setup microphone
@@ -105,7 +105,7 @@ class VoiceEngine:
                     self.logger.info("Voice Status: ElevenLabs API key missing - Using Google TTS")
 
             self.is_initialized = True
-            self.logger.info("✅ Production voice engine initialized!")
+            self.logger.info("[OK] Production voice engine initialized!")
             return True
 
         except Exception as e:
@@ -265,3 +265,4 @@ async def main_demo():
 
 if __name__ == "__main__":
     asyncio.run(main_demo())
+
