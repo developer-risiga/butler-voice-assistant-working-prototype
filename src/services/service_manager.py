@@ -2,6 +2,7 @@ import asyncio
 import logging
 import aiohttp
 import json
+import time
 from typing import List, Dict, Any
 
 class ServiceManager:
@@ -78,7 +79,7 @@ class ServiceManager:
         # This is a placeholder structure
         return vendors
     
-        def _get_mock_vendors(self, service_type: str, location: str) -> List[Dict]:
+    def _get_mock_vendors(self, service_type: str, location: str) -> List[Dict]:
         """Get detailed mock vendor data with comparison features"""
         service_names = {
             'plumber': 'Plumber',
