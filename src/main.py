@@ -447,17 +447,28 @@ class EnhancedProductionButler:
             self.logger.error(f"[VOICE] Butler: {text} (TTS Error: {e})")
     
     async def shutdown(self):
-        """Clean shutdown"""
+        """Clean shutdown with proper error handling"""
         self.is_running = False
         
-        # Show feedback stats
-        stats = await self.feedback_manager.get_feedback_stats()
-        if stats['total_feedback'] > 0:
-            self.logger.info(f"[STATS] Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
-        
-        await self.service_manager.shutdown()
-        await self.safe_speak("Enhanced Butler is shutting down. Thank you for using our advanced features!")
-        self.logger.info("[END] Enhanced Production Butler shutdown complete")
+        try:
+            # Show feedback stats
+            stats = await self.feedback_manager.get_feedback_stats()
+            if stats['total_feedback'] > 0:
+                self.logger.info(f"[STATS] Session Summary: {stats['total_feedback']} feedback entries, Average rating: {stats['average_rating']}/5")
+            
+            # Shutdown service manager
+            await self.service_manager.shutdown()
+            
+            # Speak shutdown message
+            await self.safe_speak("Enhanced Butler is shutting down. Thank you for using our advanced features!")
+            
+            self.logger.info("[END] Enhanced Production Butler shutdown complete")
+            
+        except Exception as e:
+            self.logger.error(f"[ERROR] Shutdown error: {e}")
+        finally:
+            # Ensure we exit cleanly even if there are errors
+            await asyncio.sleep(0.1)  # Small delay to ensure all tasks complete
 
 async def main():
     """Main entry point"""
@@ -473,6 +484,8 @@ async def main():
         # Start enhanced production mode
         await butler.start_enhanced_production_mode()
         
+    except KeyboardInterrupt:
+        print("\n[STOP] Received interrupt signal...")
     except Exception as e:
         print(f"[CRASH] Enhanced Butler crashed: {e}")
     finally:
