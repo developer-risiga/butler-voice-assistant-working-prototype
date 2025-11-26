@@ -25,7 +25,7 @@ class Config:
         self.MAX_VENDORS_TO_SHOW = 5
         self.CACHE_DURATION = 30
 
-        # openAI API
+        # openAI API Configuration
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
         self.OPENAI_MODEL = "gpt-3.5-turbo"
         self.USE_OPENAI = True
@@ -59,5 +59,6 @@ class Config:
         return True
 
 print("Config class initialized")
+
 
 
