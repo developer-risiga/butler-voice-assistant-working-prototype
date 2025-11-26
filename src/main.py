@@ -192,53 +192,39 @@ class EnhancedProductionButler:
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
     async def process_real_time_conversation(self, user_text: str):
-        """SIMPLIFIED REAL-TIME conversation processing WITH AI"""
+        """REAL-TIME conversation processing WITH AI - FIXED VERSION"""
         try:
             self.logger.info(f"[USER] {user_text}")
             
-            # FIRST: Check if this is a complex question for AI
-            complex_keywords = [
-                "explain", "what is", "how", "why", "tell me about", 
-                "summarize", "define", "what are", "can you explain",
-                "describe", "what do you know about", "information about"
-            ]
-            
+            # Convert to lowercase once
             user_text_lower = user_text.lower()
             
-            # Check if it's a knowledge question (not a service request)
-            is_knowledge_question = any(keyword in user_text_lower for keyword in complex_keywords)
-            is_service_request = any(word in user_text_lower for word in ['plumber', 'electrician', 'cleaner', 'carpenter', 'book', 'booking', 'service', 'repair', 'install'])
+            # SIMPLIFIED LOGIC: Use AI for explanation questions
+            explanation_keywords = ["explain", "what is", "how", "why", "tell me about", "describe"]
             
-            self.logger.info(f"[AI DEBUG] Knowledge question: {is_knowledge_question}, Service request: {is_service_request}")
+            is_explanation_request = any(keyword in user_text_lower for keyword in explanation_keywords)
+            is_service_request = any(word in user_text_lower for word in ['plumber', 'electrician', 'cleaner', 'carpenter', 'book', 'booking', 'service'])
             
-            # If it's a knowledge question AND not a service request, use AI
-            if is_knowledge_question and not is_service_request:
-                self.logger.info("[AI] Using OpenAI for knowledge question")
-                await self.safe_speak("Let me think about that...")
+            self.logger.info(f"[DEBUG] Explanation: {is_explanation_request}, Service: {is_service_request}")
+            
+            # USE AI FOR EXPLANATION QUESTIONS
+            if is_explanation_request and not is_service_request:
+                self.logger.info("[AI] Using OpenAI for explanation question")
+                
+                # Get AI response
                 ai_response = await self.ai_processor.process_query(user_text)
                 
-                # SPEAK THE RESPONSE ONLY ONCE
+                # SPEAK ONLY ONCE and return
                 await self.safe_speak(ai_response)
-                
-                # Track conversation
                 self.conversation_history.append({"user": user_text, "butler": ai_response})
-                
-                # RETURN IMMEDIATELY - don't continue to other processing
-                return
+                return  # EXIT HERE - NO DOUBLE SPEAKING
             
-            # SECOND: Use real conversation engine for service requests
-            self.logger.info("[SERVICE] Using service conversation engine")
-            response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-            
-            # Speak the response
-            await self.safe_speak(response)
-            
-            # Track conversation
-            self.conversation_history.append({"user": user_text, "butler": response})
-            
-            # Keep history manageable
-            if len(self.conversation_history) > 10:
-                self.conversation_history = self.conversation_history[-10:]
+            # USE SERVICE ENGINE FOR SERVICE REQUESTS
+            else:
+                self.logger.info("[SERVICE] Using service conversation engine")
+                response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
+                await self.safe_speak(response)
+                self.conversation_history.append({"user": user_text, "butler": response})
                     
         except Exception as e:
             self.logger.error(f"[ERROR] Conversation error: {e}")
