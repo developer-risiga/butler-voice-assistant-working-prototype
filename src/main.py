@@ -185,100 +185,27 @@ class EnhancedProductionButler:
         self.booking_data = {}
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
-      async def process_real_time_conversation(self, user_text: str):
-        """REAL-TIME conversation processing with intelligent routing"""
+    async def process_real_time_conversation(self, user_text: str):
+        """SIMPLIFIED REAL-TIME conversation processing"""
         try:
             self.logger.info(f"[USER] {user_text}")
             
-            # Check if user is in an active booking flow
-            if self.current_user_id in self.real_conversation_engine.booking_flows:
-                self.logger.info(f"[BOOKING] Continuing active booking flow")
-                response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-                await self.safe_speak(response)
-            else:
-                # Use intelligent routing for new conversations
-                await self.intelligent_conversation_router(user_text)
+            # ALWAYS use real conversation engine first (it handles booking flows internally)
+            response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
             
-            # Track conversation for analytics
-            self.conversation_history.append({"user": user_text, "butler": "response_given"})
+            # Speak the response
+            await self.safe_speak(response)
+            
+            # Track conversation
+            self.conversation_history.append({"user": user_text, "butler": response})
             
             # Keep history manageable
             if len(self.conversation_history) > 10:
                 self.conversation_history = self.conversation_history[-10:]
                     
         except Exception as e:
-            self.logger.error(f"[ERROR] REAL-TIME conversation error: {e}")
-            await self.safe_speak("I'm having trouble processing that. Let me try again. What service do you need?")
-
-    async def intelligent_conversation_router(self, user_text: str):
-        """Intelligently route conversations to the right handler"""
-        user_text_lower = user_text.lower()
-        
-        self.logger.info(f"[ROUTER] Analyzing: {user_text}")
-        
-        # 1. Emergency detection (highest priority)
-        if any(word in user_text_lower for word in ['emergency', 'urgent', 'help now', 'immediately']):
-            self.logger.info("[ROUTER] → Emergency handler")
-            await self.handle_emergency_request(user_text)
-            return
-        
-        # 2. Service request detection
-        service_type = self.real_conversation_engine.extract_service_type(user_text)
-        if service_type != "service professional":
-            self.logger.info(f"[ROUTER] → Service booking for: {service_type}")
-            await self.start_service_booking(user_text, service_type)
-            return
-        
-        # 3. Payment discussions
-        if any(word in user_text_lower for word in ['pay', 'payment', 'cost', 'price', 'how much']):
-            self.logger.info("[ROUTER] → Payment handler")
-            await self.handle_payment_discussion(user_text)
-            return
-        
-        # 4. Capabilities request
-        if any(word in user_text_lower for word in ['what can you do', 'capabilities', 'features']):
-            self.logger.info("[ROUTER] → Capabilities handler")
-            await self.demonstrate_capabilities()
-            return
-        
-        # 5. Default to human conversation
-        self.logger.info("[ROUTER] → Default human conversation")
-        response = await self.human_response_generator.generate_conversation_response(
-            user_text, self.current_user_id
-        )
-        await self.safe_speak(response)
-
-    async def start_service_booking(self, user_text: str, service_type: str):
-        """Start a service booking flow"""
-        self.logger.info(f"[BOOKING] Starting booking flow for {service_type}")
-        
-        # Start the booking flow in the real conversation engine
-        await self.real_conversation_engine.start_booking_flow(self.current_user_id, service_type)
-        
-        # Get the initial response for this service
-        response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-        await self.safe_speak(response)
-
-    async def handle_service_booking_flow(self, user_text: str):
-        """Handle complete service booking flow in real-time"""
-        try:
-            # Process with real conversation engine
-            response = await self.real_conversation_engine.process_real_query(
-                user_text, self.current_user_id
-            )
-            
-            await self.safe_speak(response)
-            
-            # Check if booking was completed
-            if "booking confirmed" in response.lower() or "booked" in response.lower():
-                self.logger.info("[BOOKING] Service booking completed successfully")
-                # Reset booking state
-                self.active_booking = None
-                self.booking_data = {}
-            
-        except Exception as e:
-            self.logger.error(f"[ERROR] Booking flow error: {e}")
-            await self.safe_speak("I encountered an issue with the booking process. Let's try again. What service did you need?")
+            self.logger.error(f"[ERROR] Conversation error: {e}")
+            await self.safe_speak("I didn't quite get that. Could you please repeat?")
 
     async def handle_emergency_request(self, user_text: str):
         """Handle emergency service requests with priority"""
@@ -332,96 +259,6 @@ class EnhancedProductionButler:
             "What would you like to try first?"
         )
         await self.safe_speak(capabilities)
-
-    # NEW: Enhanced service handling methods
-    async def process_complete_service_flow(self, service_type: str, user_input: str):
-        """Process complete service flow from detection to booking"""
-        self.logger.info(f"[SERVICE] Starting {service_type} service flow")
-        
-        # Step 1: Get problem details
-        detail_prompt = await self.service_scenarios.get_service_details_prompt(
-            service_type, user_input
-        )
-        await self.safe_speak(detail_prompt)
-        
-        # Listen for problem details
-        problem_details = await self.voice_engine.listen_command()
-        if problem_details:
-            self.booking_data['problem'] = problem_details
-            
-            # Step 2: Get timing
-            timing_question = await self.service_scenarios.get_timing_question(service_type)
-            await self.safe_speak(timing_question)
-            
-            timing_response = await self.voice_engine.listen_command()
-            if timing_response:
-                self.booking_data['timing'] = timing_response
-                
-                # Step 3: Get location
-                location_question = await self.service_scenarios.get_location_question()
-                await self.safe_speak(location_question)
-                
-                location_response = await self.voice_engine.listen_command()
-                if location_response:
-                    self.booking_data['location'] = location_response
-                    self.booking_data['service_type'] = service_type
-                    
-                    # Step 4: Confirm and book
-                    confirmation = await self.service_scenarios.get_booking_confirmation(
-                        service_type, self.booking_data
-                    )
-                    await self.safe_speak(confirmation)
-                    
-                    # Listen for confirmation
-                    confirm_response = await self.voice_engine.listen_command()
-                    if confirm_response and ('yes' in confirm_response.lower() or 'confirm' in confirm_response.lower()):
-                        await self.safe_speak("Perfect! I'm now searching for available professionals in your area...")
-                        
-                        # Simulate searching (replace with real API later)
-                        await asyncio.sleep(2)
-                        
-                        # Provide realistic booking result
-                        booking_result = (
-                            f"🎉 Booking confirmed! I've found available {service_type} professionals "
-                            f"for your {self.booking_data.get('problem', 'service')} in {self.booking_data.get('location', 'your area')}. "
-                            f"They'll contact you shortly to confirm the timing."
-                        )
-                        await self.safe_speak(booking_result)
-                        
-                        # Reset booking data
-                        self.booking_data = {}
-                    else:
-                        await self.safe_speak("No problem! I've cancelled the booking. Let me know if you need anything else.")
-                        self.booking_data = {}
-
-    # NEW: Intelligent conversation routing
-    async def route_conversation(self, user_text: str):
-        """Intelligently route conversations to appropriate handlers"""
-        user_text_lower = user_text.lower()
-        
-        # Emergency detection
-        if any(word in user_text_lower for word in ['emergency', 'urgent', 'help now', 'immediately']):
-            await self.handle_emergency_request(user_text)
-            return
-        
-        # Payment discussions
-        if any(word in user_text_lower for word in ['pay', 'payment', 'cost', 'price', 'how much']):
-            await self.handle_payment_discussion(user_text)
-            return
-        
-        # Service type detection
-        service_type = self.real_conversation_engine.extract_service_type(user_text)
-        if service_type != "service professional":
-            await self.start_service_booking(user_text, service_type)
-            return
-        
-        # Capabilities demonstration
-        if any(word in user_text_lower for word in ['what can you do', 'capabilities', 'features']):
-            await self.demonstrate_capabilities()
-            return
-        
-        # Default to general conversation
-        await self.process_real_time_conversation(user_text)
 
     async def safe_speak(self, text: str):
         """Safely speak text with error handling"""
