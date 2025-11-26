@@ -199,15 +199,15 @@ class EnhancedProductionButler:
                 "summarize", "define", "what are", "can you explain",
                 "describe", "what do you know about", "information about"
             ]
-        
+            
             user_text_lower = user_text.lower()
             
             # Check if it's a knowledge question (not a service request)
             is_knowledge_question = any(keyword in user_text_lower for keyword in complex_keywords)
             is_service_request = any(word in user_text_lower for word in ['plumber', 'electrician', 'cleaner', 'carpenter', 'book', 'booking', 'service', 'repair', 'install'])
-        
+            
             self.logger.info(f"[AI DEBUG] Knowledge question: {is_knowledge_question}, Service request: {is_service_request}")
-        
+            
             # If it's a knowledge question AND not a service request, use AI
             if is_knowledge_question and not is_service_request:
                 self.logger.info("[AI] Using OpenAI for knowledge question")
@@ -216,7 +216,7 @@ class EnhancedProductionButler:
                 await self.safe_speak(ai_response)
                 self.conversation_history.append({"user": user_text, "butler": ai_response})
                 return
-        
+            
             # SECOND: Use real conversation engine for service requests
             self.logger.info("[SERVICE] Using service conversation engine")
             response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
@@ -229,30 +229,30 @@ class EnhancedProductionButler:
             
             # Keep history manageable
             if len(self.conversation_history) > 10:
-            self.conversation_history = self.conversation_history[-10:]
-                
+                self.conversation_history = self.conversation_history[-10:]
+                    
         except Exception as e:
             self.logger.error(f"[ERROR] Conversation error: {e}")
             await self.safe_speak("I didn't quite get that. Could you please repeat?")
-    
-        async def handle_emergency_request(self, user_text: str):
-            """Handle emergency service requests with priority"""
-            self.logger.info("[EMERGENCY] Processing emergency request")
         
-        # Extract service type from emergency request
-        service_type = self.real_conversation_engine.extract_service_type(user_text)
-        
-        # Get emergency response
-        emergency_response = await self.service_scenarios.get_emergency_response(
-            service_type, user_text
-        )
-        
-        await self.safe_speak(emergency_response)
-        
-        # Start emergency booking flow
-        await self.real_conversation_engine.start_booking_flow(
-            self.current_user_id, service_type
-        )
+            async def handle_emergency_request(self, user_text: str):
+                """Handle emergency service requests with priority"""
+                self.logger.info("[EMERGENCY] Processing emergency request")
+            
+            # Extract service type from emergency request
+            service_type = self.real_conversation_engine.extract_service_type(user_text)
+            
+            # Get emergency response
+            emergency_response = await self.service_scenarios.get_emergency_response(
+                service_type, user_text
+            )
+            
+            await self.safe_speak(emergency_response)
+            
+            # Start emergency booking flow
+            await self.real_conversation_engine.start_booking_flow(
+                self.current_user_id, service_type
+            )
 
     async def handle_payment_discussion(self, user_text: str):
         """Handle payment-related conversations"""
