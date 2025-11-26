@@ -146,8 +146,8 @@ class EnhancedProductionButler:
                         self.is_awake = True
                         self.last_interaction_time = time.time()
                         await self.safe_speak("Yes, I'm here! How can I help you today?")
-                        # ADD THIS LINE - Prevent immediate re-detection
-                        await asyncio.sleep(2)
+                        # CRITICAL: Add cooldown to prevent double detection
+                        await asyncio.sleep(3)  # 3-second cooldown
                 else:
                     # Listen for command in real-time
                     user_text = await self.voice_engine.listen_command()
@@ -194,50 +194,40 @@ class EnhancedProductionButler:
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
     async def process_real_time_conversation(self, user_text: str):
-        """EMERGENCY FIX - Simple AI or Service logic"""
+        """FIXED VERSION - Proper AI and Service routing"""
         try:
             self.logger.info(f"[USER] {user_text}")
             user_lower = user_text.lower()
             
-            # USE AI for explanation questions
-            if any(word in user_lower for word in ["explain", "what is", "how", "why", "tell me", "describe"]):
-                self.logger.info("[AI] Using AI for explanation")
-                response = await self.ai_processor.process_query(user_text)
-                await self.safe_speak(response)
+            # DEBUG: Log what we're detecting
+            self.logger.info(f"[DEBUG] User said: {user_text}")
             
-            # USE SERVICE for everything else
+            # CLEAR RULE: If it's an explanation question, use AI
+            explanation_words = ["explain", "what is", "how does", "how do", "why", "tell me about", "describe"]
+            
+            is_explanation = any(word in user_lower for word in explanation_words)
+            self.logger.info(f"[DEBUG] Is explanation: {is_explanation}")
+            
+            if is_explanation:
+                self.logger.info("[AI] Routing to AI for explanation question")
+                # Speak immediately so user knows we're processing
+                await self.safe_speak("Let me explain that for you.")
+                ai_response = await self.ai_processor.process_query(user_text)
+                await self.safe_speak(ai_response)
+                self.conversation_history.append({"user": user_text, "butler": ai_response})
             else:
-                self.logger.info("[SERVICE] Using service engine")
+                self.logger.info("[SERVICE] Routing to service engine")
                 response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
                 await self.safe_speak(response)
+                self.conversation_history.append({"user": user_text, "butler": response})
             
-            # Track conversation
-            self.conversation_history.append({"user": user_text, "butler": response})
+            # Keep history manageable
             if len(self.conversation_history) > 10:
                 self.conversation_history = self.conversation_history[-10:]
                     
         except Exception as e:
-            self.logger.error(f"[ERROR] {e}")
-            await self.safe_speak("I encountered an error. Please try again.")
-        
-            async def handle_emergency_request(self, user_text: str):
-                """Handle emergency service requests with priority"""
-                self.logger.info("[EMERGENCY] Processing emergency request")
-            
-            # Extract service type from emergency request
-            service_type = self.real_conversation_engine.extract_service_type(user_text)
-            
-            # Get emergency response
-            emergency_response = await self.service_scenarios.get_emergency_response(
-                service_type, user_text
-            )
-            
-            await self.safe_speak(emergency_response)
-            
-            # Start emergency booking flow
-            await self.real_conversation_engine.start_booking_flow(
-                self.current_user_id, service_type
-            )
+            self.logger.error(f"[ERROR] Conversation error: {e}")
+            await self.safe_speak("I didn't understand that. Please try again.")
 
     async def handle_payment_discussion(self, user_text: str):
         """Handle payment-related conversations"""
