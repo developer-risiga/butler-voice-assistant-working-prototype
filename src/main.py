@@ -194,31 +194,31 @@ class EnhancedProductionButler:
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
     async def process_real_time_conversation(self, user_text: str):
-    """EMERGENCY FIX - Simple AI or Service logic"""
-    try:
-        self.logger.info(f"[USER] {user_text}")
-        user_lower = user_text.lower()
-        
-        # USE AI for explanation questions
-        if any(word in user_lower for word in ["explain", "what is", "how", "why", "tell me", "describe"]):
-            self.logger.info("[AI] Using AI for explanation")
-            response = await self.ai_processor.process_query(user_text)
-            await self.safe_speak(response)
-        
-        # USE SERVICE for everything else
-        else:
-            self.logger.info("[SERVICE] Using service engine")
-            response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-            await self.safe_speak(response)
-        
-        # Track conversation
-        self.conversation_history.append({"user": user_text, "butler": response})
-        if len(self.conversation_history) > 10:
-            self.conversation_history = self.conversation_history[-10:]
-                
-    except Exception as e:
-        self.logger.error(f"[ERROR] {e}")
-        await self.safe_speak("I encountered an error. Please try again.")
+        """EMERGENCY FIX - Simple AI or Service logic"""
+        try:
+            self.logger.info(f"[USER] {user_text}")
+            user_lower = user_text.lower()
+            
+            # USE AI for explanation questions
+            if any(word in user_lower for word in ["explain", "what is", "how", "why", "tell me", "describe"]):
+                self.logger.info("[AI] Using AI for explanation")
+                response = await self.ai_processor.process_query(user_text)
+                await self.safe_speak(response)
+            
+            # USE SERVICE for everything else
+            else:
+                self.logger.info("[SERVICE] Using service engine")
+                response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
+                await self.safe_speak(response)
+            
+            # Track conversation
+            self.conversation_history.append({"user": user_text, "butler": response})
+            if len(self.conversation_history) > 10:
+                self.conversation_history = self.conversation_history[-10:]
+                    
+        except Exception as e:
+            self.logger.error(f"[ERROR] {e}")
+            await self.safe_speak("I encountered an error. Please try again.")
         
             async def handle_emergency_request(self, user_text: str):
                 """Handle emergency service requests with priority"""
