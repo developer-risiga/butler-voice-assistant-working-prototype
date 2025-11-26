@@ -72,7 +72,7 @@ class EnhancedProductionButler:
         # NEW: Enhanced session management
         self.conversation_history = []
         self.last_interaction_time = None
-        self.session_timeout = 300  # 5 minutes of inactivity
+        self.session_timeout = 10  # 10 seconds of inactivity
         self.is_awake = False
         self.current_user_id = "default"
         
