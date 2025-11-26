@@ -195,7 +195,7 @@ class EnhancedProductionButler:
         """SIMPLIFIED REAL-TIME conversation processing WITH AI"""
         try:
             self.logger.info(f"[USER] {user_text}")
-        
+            
             # FIRST: Check if this is a complex question for AI
             complex_keywords = [
                 "explain", "what is", "how", "why", "tell me about", 
@@ -216,8 +216,14 @@ class EnhancedProductionButler:
                 self.logger.info("[AI] Using OpenAI for knowledge question")
                 await self.safe_speak("Let me think about that...")
                 ai_response = await self.ai_processor.process_query(user_text)
+                
+                # SPEAK THE RESPONSE ONLY ONCE
                 await self.safe_speak(ai_response)
+                
+                # Track conversation
                 self.conversation_history.append({"user": user_text, "butler": ai_response})
+                
+                # RETURN IMMEDIATELY - don't continue to other processing
                 return
             
             # SECOND: Use real conversation engine for service requests
