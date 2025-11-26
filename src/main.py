@@ -192,22 +192,33 @@ class EnhancedProductionButler:
         """SIMPLIFIED REAL-TIME conversation processing WITH AI"""
         try:
             self.logger.info(f"[USER] {user_text}")
-            
+        
             # FIRST: Check if this is a complex question for AI
             complex_keywords = [
-                "explain", "what is", "how to", "why", "tell me about", 
-                "summarize", "define", "what are", "how does", "can you explain"
+                "explain", "what is", "how", "why", "tell me about", 
+                "summarize", "define", "what are", "can you explain",
+                "describe", "what do you know about", "information about"
             ]
+        
+            user_text_lower = user_text.lower()
             
-            if any(keyword in user_text.lower() for keyword in complex_keywords):
-                # Use OpenAI for complex questions
-                self.logger.info("[AI] Using OpenAI for complex query")
+            # Check if it's a knowledge question (not a service request)
+            is_knowledge_question = any(keyword in user_text_lower for keyword in complex_keywords)
+            is_service_request = any(word in user_text_lower for word in ['plumber', 'electrician', 'cleaner', 'carpenter', 'book', 'booking', 'service', 'repair', 'install'])
+        
+            self.logger.info(f"[AI DEBUG] Knowledge question: {is_knowledge_question}, Service request: {is_service_request}")
+        
+            # If it's a knowledge question AND not a service request, use AI
+            if is_knowledge_question and not is_service_request:
+                self.logger.info("[AI] Using OpenAI for knowledge question")
+                await self.safe_speak("Let me think about that...")
                 ai_response = await self.ai_processor.process_query(user_text)
                 await self.safe_speak(ai_response)
                 self.conversation_history.append({"user": user_text, "butler": ai_response})
                 return
-            
-            # SECOND: Use real conversation engine for normal service requests
+        
+            # SECOND: Use real conversation engine for service requests
+            self.logger.info("[SERVICE] Using service conversation engine")
             response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
             
             # Speak the response
@@ -218,8 +229,8 @@ class EnhancedProductionButler:
             
             # Keep history manageable
             if len(self.conversation_history) > 10:
-                self.conversation_history = self.conversation_history[-10:]
-                    
+            self.conversation_history = self.conversation_history[-10:]
+                
         except Exception as e:
             self.logger.error(f"[ERROR] Conversation error: {e}")
             await self.safe_speak("I didn't quite get that. Could you please repeat?")
