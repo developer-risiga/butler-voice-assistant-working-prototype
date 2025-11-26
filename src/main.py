@@ -65,6 +65,9 @@ class EnhancedProductionButler:
         self.current_mode = "production"
         self.logger = logging.getLogger("butler.main")
         self.ai_processor = AIProcessor()
+        # NEW: Add wake word cooldown
+        self.last_wake_time = 0
+        self.wake_cooldown = 3  # 3 seconds cooldown between wake detections
 
         
         # NEW: Real-time conversation engines
