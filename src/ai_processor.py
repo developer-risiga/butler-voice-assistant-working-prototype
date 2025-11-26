@@ -9,48 +9,31 @@ class AIProcessor:
         self.setup_openai()
     
     def setup_openai(self):
-        # Get API key directly from environment
         api_key = os.getenv("OPENAI_API_KEY")
         
-        if api_key and api_key != "your_actual_openai_api_key_here":
-            openai.api_key = api_key
-            self.client = openai.OpenAI()
-            self.logger.info("✅ OpenAI ready")
-            self.logger.info(f"✅ OpenAI API key found: {api_key[:10]}...") 
+        if api_key and api_key.startswith("sk-"):
+            self.client = openai.OpenAI(api_key=api_key)
+            self.logger.info("✅ OpenAI initialized successfully")
         else:
-            self.logger.error("❌ OpenAI API key not found or is placeholder")
-            self.logger.error("❌ Check your .env file for OPENAI_API_KEY")
+            self.logger.error("❌ Invalid OpenAI API key")
     
     async def process_query(self, user_input):
         if not self.client:
-            error_msg = "I'm sorry, my AI features are currently unavailable."
-            self.logger.error("[AI] OpenAI client not available")
-            return error_msg
+            return "AI service is currently unavailable."
         
         try:
-            self.logger.info(f"[AI] Processing query: {user_input}")
+            self.logger.info(f"[AI] Asking: {user_input}")
             
-            # SIMPLIFIED API call with better error handling
             response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system", 
-                        "content": "You are Butler, a helpful voice assistant. Answer in 2-3 short sentences."
-                    },
-                    {
-                        "role": "user", 
-                        "content": user_input
-                    }
-                ],
-                max_tokens=100,
-                temperature=0.7
+                messages=[{"role": "user", "content": user_input}],
+                max_tokens=150
             )
             
-            ai_response = response.choices[0].message.content.strip()
-            self.logger.info(f"[AI SUCCESS] Response: {ai_response}")
-            return ai_response
+            answer = response.choices[0].message.content
+            self.logger.info(f"[AI] Answer: {answer}")
+            return answer
             
         except Exception as e:
-            self.logger.error(f"[AI ERROR] OpenAI API error: {str(e)}")
-            return "I apologize, but I'm having trouble accessing my knowledge right now. Please try again in a moment."
+            self.logger.error(f"[AI ERROR] {e}")
+            return "I apologize, but I'm having trouble accessing information right now. Please try a different question."
