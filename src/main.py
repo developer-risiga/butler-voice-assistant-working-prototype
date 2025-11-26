@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from ai_processor import AIProcessor
 from utils.safe_logging import configure_logging
 configure_logging()
 
@@ -63,6 +64,8 @@ class EnhancedProductionButler:
         self.is_running = False
         self.current_mode = "production"
         self.logger = logging.getLogger("butler.main")
+        self.ai_processor = AIProcessor()
+
         
         # NEW: Real-time conversation engines
         self.real_conversation_engine = RealConversationEngine()
@@ -186,26 +189,40 @@ class EnhancedProductionButler:
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
     async def process_real_time_conversation(self, user_text: str):
-        """SIMPLIFIED REAL-TIME conversation processing"""
-        try:
-            self.logger.info(f"[USER] {user_text}")
-            
-            # ALWAYS use real conversation engine first (it handles booking flows internally)
-            response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-            
-            # Speak the response
-            await self.safe_speak(response)
-            
-            # Track conversation
-            self.conversation_history.append({"user": user_text, "butler": response})
-            
-            # Keep history manageable
-            if len(self.conversation_history) > 10:
-                self.conversation_history = self.conversation_history[-10:]
-                    
-        except Exception as e:
-            self.logger.error(f"[ERROR] Conversation error: {e}")
-            await self.safe_speak("I didn't quite get that. Could you please repeat?")
+    """SIMPLIFIED REAL-TIME conversation processing WITH AI"""
+    try:
+        self.logger.info(f"[USER] {user_text}")
+        
+        # FIRST: Check if this is a complex question for AI
+        complex_keywords = [
+            "explain", "what is", "how to", "why", "tell me about", 
+            "summarize", "define", "what are", "how does", "can you explain"
+        ]
+        
+        if any(keyword in user_text.lower() for keyword in complex_keywords):
+            # Use OpenAI for complex questions
+            self.logger.info("[AI] Using OpenAI for complex query")
+            ai_response = await self.ai_processor.process_query(user_text)
+            await self.safe_speak(ai_response)
+            self.conversation_history.append({"user": user_text, "butler": ai_response})
+            return
+        
+        # SECOND: Use real conversation engine for normal service requests
+        response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
+        
+        # Speak the response
+        await self.safe_speak(response)
+        
+        # Track conversation
+        self.conversation_history.append({"user": user_text, "butler": response})
+        
+        # Keep history manageable
+        if len(self.conversation_history) > 10:
+            self.conversation_history = self.conversation_history[-10:]
+                
+    except Exception as e:
+        self.logger.error(f"[ERROR] Conversation error: {e}")
+        await self.safe_speak("I didn't quite get that. Could you please repeat?")
 
     async def handle_emergency_request(self, user_text: str):
         """Handle emergency service requests with priority"""
