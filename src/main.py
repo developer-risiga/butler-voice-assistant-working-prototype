@@ -194,43 +194,31 @@ class EnhancedProductionButler:
         self.human_response_generator.clear_conversation_history(self.current_user_id)
     
     async def process_real_time_conversation(self, user_text: str):
-        """REAL-TIME conversation processing WITH AI - FIXED VERSION"""
-        try:
-            self.logger.info(f"[USER] {user_text}")
-            
-            # Convert to lowercase once
-            user_text_lower = user_text.lower()
-            
-            # SIMPLIFIED LOGIC: Use AI for explanation questions
-            explanation_keywords = ["explain", "what is", "how", "why", "tell me about", "describe"]
-            
-            is_explanation_request = any(keyword in user_text_lower for keyword in explanation_keywords)
-            is_service_request = any(word in user_text_lower for word in ['plumber', 'electrician', 'cleaner', 'carpenter', 'book', 'booking', 'service'])
-            
-            self.logger.info(f"[DEBUG] Explanation: {is_explanation_request}, Service: {is_service_request}")
-            
-            # USE AI FOR EXPLANATION QUESTIONS
-            if is_explanation_request and not is_service_request:
-                self.logger.info("[AI] Using OpenAI for explanation question")
+    """EMERGENCY FIX - Simple AI or Service logic"""
+    try:
+        self.logger.info(f"[USER] {user_text}")
+        user_lower = user_text.lower()
+        
+        # USE AI for explanation questions
+        if any(word in user_lower for word in ["explain", "what is", "how", "why", "tell me", "describe"]):
+            self.logger.info("[AI] Using AI for explanation")
+            response = await self.ai_processor.process_query(user_text)
+            await self.safe_speak(response)
+        
+        # USE SERVICE for everything else
+        else:
+            self.logger.info("[SERVICE] Using service engine")
+            response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
+            await self.safe_speak(response)
+        
+        # Track conversation
+        self.conversation_history.append({"user": user_text, "butler": response})
+        if len(self.conversation_history) > 10:
+            self.conversation_history = self.conversation_history[-10:]
                 
-                # Get AI response
-                ai_response = await self.ai_processor.process_query(user_text)
-                
-                # SPEAK ONLY ONCE and return
-                await self.safe_speak(ai_response)
-                self.conversation_history.append({"user": user_text, "butler": ai_response})
-                return  # EXIT HERE - NO DOUBLE SPEAKING
-            
-            # USE SERVICE ENGINE FOR SERVICE REQUESTS
-            else:
-                self.logger.info("[SERVICE] Using service conversation engine")
-                response = await self.real_conversation_engine.process_real_query(user_text, self.current_user_id)
-                await self.safe_speak(response)
-                self.conversation_history.append({"user": user_text, "butler": response})
-                    
-        except Exception as e:
-            self.logger.error(f"[ERROR] Conversation error: {e}")
-            await self.safe_speak("I didn't quite get that. Could you please repeat?")
+    except Exception as e:
+        self.logger.error(f"[ERROR] {e}")
+        await self.safe_speak("I encountered an error. Please try again.")
         
             async def handle_emergency_request(self, user_text: str):
                 """Handle emergency service requests with priority"""
