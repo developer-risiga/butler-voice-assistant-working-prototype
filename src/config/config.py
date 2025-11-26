@@ -14,7 +14,12 @@ class Config:
         self.AUDIO_SAMPLE_RATE = 16000
         self.AUDIO_CHUNK_SIZE = 1024
         self.MAX_RECORDING_SECONDS = 8
-        
+
+        # New : Add conversation timing settings
+        self.SLEEP_BETWEEN_CONVERSATIONS = 2  # 2 seconds instead of 300
+        self.LISTENING_TIMEOUT = 10  # How long to wait for user speech
+        self.WAKE_WORD_TIMEOUT = 5   # How often to check for wake word
+       
         # Service Settings
         self.DEFAULT_LOCATION = "Bangalore"
         self.MAX_VENDORS_TO_SHOW = 5
@@ -49,3 +54,4 @@ class Config:
         return True
 
 print("Config class initialized")
+
