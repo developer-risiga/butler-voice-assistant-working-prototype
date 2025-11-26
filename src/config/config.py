@@ -24,6 +24,11 @@ class Config:
         self.DEFAULT_LOCATION = "Bangalore"
         self.MAX_VENDORS_TO_SHOW = 5
         self.CACHE_DURATION = 30
+
+        # openAI API
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        self.OPENAI_MODEL = "gpt-3.5-turbo"
+        self.USE_OPENAI = True
         
         # Hardware
         self.LED_PIN = 18
@@ -54,4 +59,5 @@ class Config:
         return True
 
 print("Config class initialized")
+
 
