@@ -140,12 +140,14 @@ class EnhancedProductionButler:
                         self._reset_conversation_state()
                 
                 if not self.is_awake:
-                    # Wait for wake word
+                    # Wait for wake word with cooldown
                     wake_detected = await self.voice_engine.wait_for_wake_word()
                     if wake_detected:
                         self.is_awake = True
                         self.last_interaction_time = time.time()
                         await self.safe_speak("Yes, I'm here! How can I help you today?")
+                        # ADD THIS LINE - Prevent immediate re-detection
+                        await asyncio.sleep(2)
                 else:
                     # Listen for command in real-time
                     user_text = await self.voice_engine.listen_command()
